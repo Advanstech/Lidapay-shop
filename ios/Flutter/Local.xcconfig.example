@@ -1,0 +1,4 @@
+// Copy this file to Local.xcconfig (gitignored) and set your restricted
+// Google Maps API key for the courier driver pin on order tracking.
+// Restrict it in Google Cloud Console: iOS bundle id only.
+GOOGLE_MAPS_API_KEY =

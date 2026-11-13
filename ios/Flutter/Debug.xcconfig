@@ -1,0 +1,6 @@
+#include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"
+#include "Generated.xcconfig"
+
+// Optional local overrides — copy Local.xcconfig.example to Local.xcconfig
+// (gitignored) and set GOOGLE_MAPS_API_KEY for the courier driver map.
+#include? "Local.xcconfig"

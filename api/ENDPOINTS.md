@@ -1,0 +1,194 @@
+# Lidapay API endpoint map
+
+Base URL: https://api.advansistechnologies.com
+Spec extracted: 2026-09-29 from /api-doc (swagger-ui-init.js)
+
+- `GET /` — AppController_getHello
+- `GET /api/v1/.well-known/assetlinks.json` — DigitalAssetLinksController_getAssetLinks
+- `GET /api/v1/transaction-status/decision/{decisionId}` — Check recipient decision status
+- `GET /api/v1/transaction-status/transaction/{transactionRef}` — Check transaction status
+- `POST /api/v1/auth/login/request-otp` — Request login email OTP after validating username/password
+- `POST /api/v1/auth/login/verify-otp` — Verify login email OTP and return access/refresh tokens
+- `POST /api/v1/auth/refresh` — Refresh access and refresh tokens (mobile compatibility endpoint)
+- `POST /api/v1/users/register` — Register a new user with optional FCM token registration
+- `POST /api/v1/users/login` — Login a user with optional FCM token registration
+- `POST /api/v1/users/refresh-token` — Generate a new refresh token (legacy endpoint)
+- `GET /api/v1/users/points` — Get user points
+- `GET /api/v1/users/profile` — Get user profile
+- `PUT /api/v1/users/profile/update` — Update user profile
+- `GET /api/v1/users` — Get all users
+- `GET /api/v1/users/phone/{phoneNumber}` — Get a user by phone number
+- `GET /api/v1/users/email/{email}` — Get a user by email
+- `DELETE /api/v1/users/delete/{id}` — Delete a user by ID
+- `DELETE /api/v1/users/delete` — Delete all users
+- `POST /api/v1/users/merchant/login` — Merchant login
+- `PUT /api/v1/users/change-password` — Request password change (email verification required)
+- `POST /api/v1/users/confirm-password-change` — Confirm password change via email verification token
+- `POST /api/v1/users/track-qr-code-usage` — Track QR code usage
+- `GET /api/v1/users/qr-code-usage-stats` — Get QR code usage stats
+- `POST /api/v1/users/{userId}/scan-qr` — Scan a user's QR code
+- `GET /api/v1/users/invitation-link/generate` — Generate an invitation link for the user
+- `POST /api/v1/users/invitation-link/track` — Track the usage of an invitation link
+- `GET /api/v1/users/invitation-link/stats` — Get statistics for the user's invitation links
+- `GET /api/v1/users/verify-email/{token}` — Verify user email
+- `POST /api/v1/users/resend-verification-email` — Resend email verification link
+- `POST /api/v1/users/verify-phone` — Verify user phone number
+- `POST /api/v1/users/resend-phone-verification-code` — Resend phone verification code
+- `POST /api/v1/users/reset-password` — Initiate password reset
+- `POST /api/v1/users/confirm-reset-password` — Confirm password reset with token
+- `POST /api/v1/users/wallet` — Create or update user wallet
+- `DELETE /api/v1/users/wallet` — Delete user wallet
+- `GET /api/v1/users/wallet/{id}` — Get wallet by ID
+- `GET /api/v1/users/wallet/user` — Get user wallet
+- `GET /api/v1/users/account` — Get user account
+- `POST /api/v1/users/push-token` — Register or refresh a push token for the authenticated user
+- `POST /api/v1/merchants/register` — Register a new merchant
+- `POST /api/v1/merchants/login` — Merchant login
+- `GET /api/v1/merchants/client/{id}` — Find a merchant by ID
+- `GET /api/v1/merchants/{id}` — Find a merchant by ID
+- `DELETE /api/v1/merchants/{id}` — Delete a merchant
+- `GET /api/v1/merchants` — Find all registered merchants
+- `PUT /api/v1/merchants/update/{id}` — Update a merchant
+- `GET /api/v1/merchants/{clientId}/qrcode` — Get a merchant QR code
+- `PUT /api/v1/merchants/{clientId}/change-password` — Change merchant password
+- `POST /api/v1/merchants/{clientId}/track-qr-usage` — Track QR code usage for a merchant
+- `GET /api/v1/merchants/{clientId}/qr-usage-stats` — Get QR code usage stats for a merchant
+- `POST /api/v1/merchants/{clientId}/scan-qr` — Scan QR code
+- `POST /api/v1/merchants/generate-invitation-link` — Generate invitation link
+- `GET /api/v1/merchants/track-invitation-link/{invitationLink}` — Track invitation link usage
+- `GET /api/v1/merchants/invitation-link-stats` — Get invitation link stats
+- `POST /api/v1/transactions/create` — Create a new transaction
+- `GET /api/v1/transactions` — Get all transactions with pagination
+- `GET /api/v1/transactions/{id}` — Get transaction by ID
+- `PUT /api/v1/transactions/update/trxn-id{trxn}` — Update transaction by transaction ID
+- `PUT /api/v1/transactions/update/trans-id/{transId}` — Update transaction by transaction ID and TransId
+- `DELETE /api/v1/transactions/delete/{trxn}` — Delete transaction by transaction ID and TransId and Trxn
+- `GET /api/v1/transactions/user/{userId}` — Get transactions by user ID with pagination
+- `GET /api/v1/transactions/stats/{userId}` — Get transaction statistics for a user
+- `GET /api/v1/transactions/date-range` — Get transactions by date range
+- `DELETE /api/v1/transactions/remove/{id}` — Delete transaction
+- `GET /api/v1/transactions/trans-id/{transId}` — Get transaction by transaction ID
+- `GET /api/v1/transactions/trans-trxn/{trxn}` — Get transaction by transaction reference
+- `POST /api/v1/notifications` — Create a new notification
+- `GET /api/v1/notifications` — Find all notifications
+- `GET /api/v1/notifications/{id}` — Find a notification by ID
+- `PUT /api/v1/notifications/{id}` — Update a notification
+- `DELETE /api/v1/notifications/{id}` — Delete a notification
+- `POST /api/v1/notifications/device-token` — Register or refresh a device push token for the authenticated user
+- `DELETE /api/v1/notifications/device-token` — Deactivate a device push token for the authenticated user
+- `GET /api/v1/notifications/device-token` — Get all active device tokens for the authenticated user
+- `GET /api/v1/notifications/device-token/metrics` — Get in-memory push/token operational counters (debug/ops)
+- `POST /api/v1/notifications/push-token` — Register or refresh a push token (alias for device-token)
+- `POST /api/v1/rewards` — Create a new reward
+- `GET /api/v1/rewards` — Find all rewards
+- `GET /api/v1/rewards/{userId}` — Find a reward by userId
+- `PUT /api/v1/rewards/{userId}` — Update a reward
+- `DELETE /api/v1/rewards/{userId}` — Delete a reward
+- `POST /api/v1/admin/normalize-phone-numbers` — Normalize existing user phone numbers (ADMIN ONLY)
+- `GET /api/v1/admin/phone-stats` — Get phone number statistics (ADMIN ONLY)
+- `POST /api/v1/affiliate` — Create a new affiliate
+- `GET /api/v1/affiliate/all` — Get all affiliates
+- `GET /api/v1/affiliate/{code}` — Get referral by code
+- `GET /api/v1/affiliate/dashboard/summary` — Get dashboard summary
+- `POST /api/v1/affiliate/trigger-commission-update` — Trigger commission update
+- `POST /api/v1/airtime/transtatus` — Query transaction status
+- `POST /api/v1/airtime/topup` — Process airtime top-up (One4All)
+- `GET /api/v1/admin/incentive-policy` — Get effective incentive policy configuration
+- `PUT /api/v1/admin/incentive-policy` — Update incentive policy configuration (DB-backed)
+- `GET /api/v1/lidapoints/balance` — Get current user Lidapoint balance
+- `GET /api/v1/lidapoints/history` — Get current user Lidapoint history
+- `GET /api/v1/lida-value/balance` — Get current user Lida Value balance
+- `GET /api/v1/lida-value/test-credit/{userId}/{amount}` — Test Lida Value crediting (development only)
+- `GET /api/v1/lida-value/test-balance/{userId}` — Test Lida Value balance check
+- `GET /api/v1/lida-value/history` — Get current user Lida Value transaction history
+- `POST /api/v1/lida-value/use` — Use Lida Value for self (buy airtime/data for self)
+- `POST /api/v1/lida-value/send` — Send Lida Value to another user
+- `POST /api/v1/lida-value/sell` — Sell back Lida Value
+- `POST /api/v1/lida-value/convert` — Convert Lida Value to cash/crypto/mobile money
+- `GET /api/v1/lida-value/eligibility` — Check if user can save to Lida Value
+- `GET /api/v1/lida-value-wallet/balance` — Get current user Lida Value balance (fallback endpoint)
+- `GET /api/v1/lida-value-wallet/history` — Get current user Lida Value history (fallback endpoint)
+- `POST /api/v1/lida-value-wallet/use` — Use Lida Value for self (fallback endpoint)
+- `POST /api/v1/lida-value-wallet/send` — Send Lida Value to another user (fallback endpoint)
+- `POST /api/v1/recipient/eligibility` — Check recipient registration and decision eligibility
+- `POST /api/v1/topups/{topupOrderId}/recipient-decision` — Create or return active pending recipient decision for a topup order
+- `GET /api/v1/topups/{topupOrderId}/recipient-decision` — Get recipient decision linked to a topup order
+- `GET /api/v1/recipient-decisions/{decisionId}` — Get recipient decision status by decision id
+- `GET /api/v1/topups/{topupOrderId}/recipient-decision/status` — Alias for recipient decision status by topup order
+- `POST /api/v1/recipient-decisions/{decisionId}/respond` — Respond to pending recipient decision
+- `POST /api/v1/recipient-decisions/{decisionId}/resolve-timeout` — Resolve expired recipient decision to default LIDA_VALUE (worker/internal use)
+- `POST /api/v1/topups/{topupOrderId}/expire-to-lida-value` — Resolve an expired topup decision to Lida Value using topup order id
+- `POST /api/v1/recipient-decisions/resolve-expired` — Batch resolve all expired pending decisions (worker/internal use)
+- `GET /api/v1/topups/{topupOrderId}/status` — Get canonical topup status for decision and delivery states
+- `GET /api/v1/reload-airtime/token` — Generate access token
+- `GET /api/v1/reload-airtime/test` — Test endpoint
+- `POST /api/v1/reload-airtime/recharge` — Recharge airtime
+- `POST /api/v1/reload-airtime/recharge-async` — Recharge airtime asynchronously
+- `POST /api/v1/reload-airtime/phone-lookup` — Validate phone number and detect operator (MNP Lookup)
+- `GET /api/v1/reload-airtime/topup-status/{transactionId}` — Get Topup Transaction Status
+- `GET /api/v1/reloadly-data/data-test` — Health check for Reloadly Data integration
+- `GET /api/v1/reloadly-data/auto-detect` — Auto-detect operator by MSISDN and country code
+- `POST /api/v1/reloadly-data/list-operators` — List data operators by country code
+- `POST /api/v1/reloadly-data/buy-data` — Purchase internet data bundle
+- `POST /api/v1/internet/buydata` — Buy internet data (One4All)
+- `POST /api/v1/internet/bundlelist` — List data bundles
+- `POST /api/v1/mobilemoney/send` — Send money to a recipient
+- `POST /api/v1/mobilemoney/receive` — Receive money from a sender
+- `POST /api/v1/psmobilemoney/transfermoney` — Transfer mobile money
+- `POST /api/v1/psmobilemoney/debitwallet` — Debit mobile money
+- `GET /api/v1/pscardpayment/redirecturl` — Primary Callback
+- `POST /api/v1/pscardpayment/inline` — Inline Card Mobile Payments
+- `POST /api/v1/sms/sendsms` — Send SMS
+- `POST /api/v1/sms/bulk` — Send Bulk SMS
+- `GET /api/v1/reloadly/account-balance` — Get Reloadly account balance
+- `GET /api/v1/reloadly/access-token` — Generate Reloadly access token
+- `GET /api/v1/reloadly/country-list` — List supported countries
+- `POST /api/v1/reloadly/find-country-by-code` — Find country by ISO code
+- `POST /api/v1/reloadly/network-operators` — List network operators with pagination and filters
+- `POST /api/v1/reloadly/find-operator-by-id` — Find operator by ID
+- `POST /api/v1/reloadly/operator/autodetect` — Auto-detect operator by phone and country
+- `POST /api/v1/reloadly/get-operator-by-code` — Get operators by country ISO code with filters
+- `GET /api/v1/reloadly/operators/{operatorId}/fx-rate` — Fetch FX rate for operator and amount
+- `POST /api/v1/auth/access-token` — Generate a Reloadly access token
+- `GET /api/v1/advansispay/redirect-url` — Handle payment callback
+- `POST /api/v1/advansispay/initiate-payment` — Initiate a mobile money payment
+- `POST /api/v1/advansispay/debit-wallet` — Process a mobile money transaction
+- `POST /api/v1/advansispay/query-transaction` — Query transaction by token
+- `POST /api/v1/advansispay/post-status` — Receive payment status update from ExpressPay
+- `POST /api/v1/advansispay/constant-capital/initiate-payment` — Initiate a Constant Capital wallet-funding payment
+- `GET /api/v1/shop/categories` — List all product categories
+- `POST /api/v1/shop/categories` — Create a product category (admin)
+- `GET /api/v1/shop/categories/{id}` — Get a category by ID
+- `PUT /api/v1/shop/categories/{id}` — Update a category (admin)
+- `DELETE /api/v1/shop/categories/{id}` — Delete a category (admin). Fails if products are attached.
+- `GET /api/v1/shop/products` — Browse products with pagination, search, and filters
+- `POST /api/v1/shop/products` — Create a product (admin / partner)
+- `GET /api/v1/shop/products/featured` — List featured products
+- `GET /api/v1/shop/products/{id}` — Get product details by ID
+- `PUT /api/v1/shop/products/{id}` — Update a product (admin / partner)
+- `DELETE /api/v1/shop/products/{id}` — Delete a product (admin)
+- `GET /api/v1/shop/cart` — Get current user cart with summary
+- `POST /api/v1/shop/cart/add` — Add a product to cart
+- `PUT /api/v1/shop/cart/update` — Update cart item quantity
+- `POST /api/v1/shop/cart/remove` — Remove a product from cart
+- `DELETE /api/v1/shop/cart/clear` — Clear all items from cart
+- `POST /api/v1/shop/checkout` — Checkout — create an order from cart contents
+- `GET /api/v1/shop/orders` — List current user orders (paginated)
+- `GET /api/v1/shop/orders/{id}` — Get order details by ID (user sees only own orders)
+- `GET /api/v1/shop/orders/number/{orderNumber}` — Look up an order by order number (public tracking)
+- `POST /api/v1/shop/orders/{id}/cancel` — Cancel an order (customer). Only pending or processing orders can be cancelled.
+- `GET /api/v1/shop/admin/orders` — List all orders (admin). Filter by status or paymentStatus.
+- `PUT /api/v1/shop/admin/orders/{id}/status` — Update order status (admin). Enforces valid status transitions.
+- `PUT /api/v1/shop/admin/orders/{id}/payment` — Update payment status (admin). Auto-advances order to "paid" on success.
+- `GET /api/v1/shop/orders/{id}/tracking` — Get delivery tracking info for an order
+- `PUT /api/v1/shop/admin/orders/{id}/delivery` — Update delivery tracking (admin / fulfilment). Adds a delivery update entry.
+- `POST /api/v1/gtpay/services` — List services available on the GTBank Partner API
+- `POST /api/v1/gtpay/query` — Query / verify customer details or account balance on a service
+- `POST /api/v1/gtpay/pay` — Pay for a service / complete a merchant transaction
+- `POST /api/v1/gtpay/status` — Query the status of a previously initiated transaction
+- `POST /api/v1/gtpay/banks` — List supported banks for bank transfer services
+- `GET /api/v1/gtpay/banks` — List supported banks for bank transfer services (GET)
+- `GET /api/v1/gtpay/outbound-ip` — Get this server's outbound public IP (for GTBank whitelisting)
+- `POST /api/v1/gtpay/callback` — Receive async transaction status callback from GTBank
+- `GET /system/verify-env` — Verify environment variables are loaded
+- `GET /system/health` — Health check with environment status
