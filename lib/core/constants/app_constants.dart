@@ -13,7 +13,7 @@ class AppConstants {
   static const Duration otpResendCooldown = Duration(minutes: 2);
 
   static const String appName = 'Lidapay';
-  static const String appVersion = '1.0.0';
+  static const String appVersion = '1.1.1';
   static const String defaultCountryCode = 'GH';
   static const String defaultCurrency = 'GHS';
   static const String defaultLocale = 'en_GH';

@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'app.dart';
 import 'core/device/device_identity.dart';
 import 'core/network/token_store.dart';
+import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/providers.dart';
 
@@ -30,6 +31,8 @@ void main() {
       debugPrint('LidaPay Caught Platform Error: $error');
       return true; // Handled; avoid crashing host process
     };
+
+    ProviderContainer? appContainer;
 
     // Graceful Error Widget Builder (anti-red screen of death in production)
     ErrorWidget.builder = (FlutterErrorDetails details) {
@@ -69,7 +72,10 @@ void main() {
                       foregroundColor: Colors.white,
                     ),
                     onPressed: () {
-                      // Attempt hot UI recovery
+                      try {
+                        appContainer?.read(routerProvider).go(AppRoutes.home);
+                        WidgetsBinding.instance.reassembleApplication();
+                      } catch (_) {}
                     },
                     icon: const Icon(Icons.refresh_rounded, size: 18),
                     label: const Text('Refresh Screen'),
@@ -102,6 +108,7 @@ void main() {
         deviceIdentityProvider.overrideWithValue(identity),
       ],
     );
+    appContainer = container;
 
     // Fast-boot with bounded timeout: prevent splash freeze if network/keystore is slow
     try {

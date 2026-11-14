@@ -71,17 +71,32 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
     if (!kIsWeb) _probeBiometrics();
     if (widget.passwordResetComplete) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Password updated. Sign in with your new password.',
-            ),
-          ),
-        );
-      });
+      _onPasswordResetComplete();
     }
+  }
+
+  @override
+  void didUpdateWidget(covariant LoginScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.passwordResetComplete && !oldWidget.passwordResetComplete) {
+      _onPasswordResetComplete();
+    }
+  }
+
+  void _onPasswordResetComplete() {
+    if (_inVerifyStep) {
+      _verifyMode = _VerifyMode.password;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Password updated. Sign in with your new password.',
+          ),
+        ),
+      );
+    });
   }
 
   Future<void> _probeBiometrics() async {

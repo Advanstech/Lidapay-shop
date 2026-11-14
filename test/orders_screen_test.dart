@@ -8,14 +8,17 @@ import 'package:lidapay_app/features/shop/providers.dart';
 import 'package:lidapay_app/features/shop/screens/orders_screen.dart';
 
 void main() {
-  Widget buildTestableScreen({required MockShopRepository repository}) {
+  Widget buildTestableScreen({
+    required MockShopRepository repository,
+    String? initialOrderId,
+  }) {
     return ProviderScope(
       overrides: [
         shopRepositoryProvider.overrideWithValue(repository),
       ],
       child: MaterialApp(
         theme: AppTheme.light(),
-        home: const OrdersScreen(),
+        home: OrdersScreen(initialOrderId: initialOrderId),
       ),
     );
   }
@@ -80,6 +83,19 @@ void main() {
 
     expect(find.text('No orders yet'), findsOneWidget);
     expect(find.text('Explore Shop'), findsOneWidget);
+  });
+
+  testWidgets('initialOrderId automatically opens matching order detail sheet', (
+    tester,
+  ) async {
+    final repo = MockShopRepository();
+    await tester.pumpWidget(
+      buildTestableScreen(repository: repo, initialOrderId: 'ord_demo_1'),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Delivery Tracking'), findsOneWidget);
+    expect(find.textContaining('GHP-TRACK'), findsOneWidget);
   });
 }
 

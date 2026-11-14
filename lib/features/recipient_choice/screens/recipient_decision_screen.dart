@@ -8,6 +8,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../auth/providers.dart';
+import '../../notifications/providers.dart';
 import '../../services/providers.dart';
 import '../data/recipient_models.dart';
 import '../providers.dart';
@@ -38,6 +39,13 @@ class _RecipientDecisionScreenState
   void initState() {
     super.initState();
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(readNotificationsProvider.notifier).markRead(
+        'decision_${widget.decisionId}',
+        relatedKeys: ['decision|${widget.decisionId}'],
+      );
+    });
   }
 
   @override

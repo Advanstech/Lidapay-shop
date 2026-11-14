@@ -89,9 +89,16 @@ class RemoteAuthRepository implements AuthRepository {
     );
     if (access == null) return null;
     _fillUserIdFromJwt(profileJson, access);
+    final user = UserProfile.fromJson(profileJson);
+    // Pre-fix OTP sessions carried sub: "undefined" with no usable user id,
+    // which the updated backend now rejects with 401. Evict them at launch.
+    if (user.id.isEmpty && _hasInvalidJwtSub(access)) {
+      await _tokens.clear(clearBiometric: true);
+      return null;
+    }
     return AuthSession(
       tokens: AuthTokens(accessToken: access, refreshToken: refresh),
-      user: UserProfile.fromJson(profileJson),
+      user: user,
     );
   }
 
@@ -113,21 +120,39 @@ class RemoteAuthRepository implements AuthRepository {
     if (id != null) userJson['_id'] = id;
   }
 
-  static String? _jwtClaim(String token, List<String> keys) {
+  static Map<String, dynamic>? _jwtPayload(String token) {
     try {
       final parts = token.split('.');
       if (parts.length != 3) return null;
       var payload = parts[1].replaceAll('-', '+').replaceAll('_', '/');
       payload += '=' * ((4 - payload.length % 4) % 4);
-      final json = jsonDecode(utf8.decode(base64Decode(payload)));
-      if (json is! Map) return null;
-      for (final key in keys) {
-        final value = json[key];
-        if (value != null && value.toString().isNotEmpty) {
-          return value.toString();
-        }
+      final decoded = jsonDecode(utf8.decode(base64Decode(payload)));
+      return decoded is Map ? Map<String, dynamic>.from(decoded) : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static bool _hasInvalidJwtSub(String token) {
+    final json = _jwtPayload(token);
+    if (json == null) return false;
+    final sub = json['sub']?.toString().trim();
+    if (sub != 'undefined' && sub != 'null') return false;
+    return _jwtClaim(token, const ['sub', 'userId', '_id', 'id']) == null;
+  }
+
+  static String? _jwtClaim(String token, List<String> keys) {
+    final json = _jwtPayload(token);
+    if (json == null) return null;
+    for (final key in keys) {
+      final value = json[key]?.toString().trim();
+      if (value != null &&
+          value.isNotEmpty &&
+          value != 'undefined' &&
+          value != 'null') {
+        return value;
       }
-    } catch (_) {}
+    }
     return null;
   }
 

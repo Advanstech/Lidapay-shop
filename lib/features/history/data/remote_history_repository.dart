@@ -38,7 +38,7 @@ class RemoteHistoryRepository implements HistoryRepository {
   }) async {
     final feed = await ActivityFeed(
       _api,
-      _requiredUserId,
+      _userId ?? '',
     ).fetch(ledgerLimit: page * pageSize + 50);
     var items = feed;
     if (filter != null && filter.isActive) {

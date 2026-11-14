@@ -80,6 +80,8 @@ abstract final class AppRoutes {
   /// notification tap can reach them from anywhere.
   static String recipientDecision(String decisionId) =>
       '/recipient-decision/$decisionId';
+
+  static String orderDetail(String orderId) => '/shop/orders/$orderId';
 }
 
 const _onboardingKey = 'onboarding_seen_v1';
@@ -105,10 +107,20 @@ final routerProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) async {
       // `lidapay://` URIs are delivered to the AppLinks stream too; keep the
       // custom scheme out of go_router entirely and let the payment
-      // deep-link handler push the callback route itself.
+      // deep-link handler push the callback route itself, except for the
+      // post-reset login return which needs no parked session.
       if (state.uri.scheme.isNotEmpty &&
           state.uri.scheme != 'http' &&
           state.uri.scheme != 'https') {
+        if (state.uri.scheme == 'lidapay' &&
+            (state.uri.host == 'auth' ||
+                state.uri.path.contains('password-reset-complete')) &&
+            state.uri.path.contains('password-reset-complete')) {
+          return Uri(
+            path: AppRoutes.login,
+            queryParameters: const {'passwordReset': '1'},
+          ).toString();
+        }
         return AppRoutes.splash;
       }
       if (state.matchedLocation == AppRoutes.splash) return null;
@@ -329,7 +341,18 @@ final routerProvider = Provider<GoRouter>((ref) {
                   GoRoute(
                     path: 'orders',
                     parentNavigatorKey: _rootNavigatorKey,
-                    builder: (context, state) => const OrdersScreen(),
+                    builder: (context, state) => OrdersScreen(
+                      initialOrderId: state.uri.queryParameters['orderId'],
+                    ),
+                    routes: [
+                      GoRoute(
+                        path: ':orderId',
+                        parentNavigatorKey: _rootNavigatorKey,
+                        builder: (context, state) => OrdersScreen(
+                          initialOrderId: state.pathParameters['orderId'],
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

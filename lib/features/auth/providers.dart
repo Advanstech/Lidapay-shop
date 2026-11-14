@@ -69,6 +69,10 @@ class AuthNotifier extends StateNotifier<AuthSession?> {
   OtpChallengeResponse? _pendingOtpChallenge;
   String? _pendingOtpUsername;
   DateTime? _emailVerificationSentAt;
+  bool _didAttemptRestore = false;
+
+  /// Whether cold-start session restoration has already run for this notifier.
+  bool get didAttemptRestore => _didAttemptRestore;
 
   /// The resend endpoint is rate-limited; block repeat taps inside this
   /// window so they never reach the API (the backend enforces its own
@@ -153,6 +157,7 @@ class AuthNotifier extends StateNotifier<AuthSession?> {
 
   /// Restores a persisted session at cold start.
   Future<void> restore() async {
+    _didAttemptRestore = true;
     if (state != null) return;
     state = await _repository.restoreSession();
     if (state != null && onAuthenticated != null) {
@@ -198,6 +203,11 @@ class AuthNotifier extends StateNotifier<AuthSession?> {
         state = AuthSession(tokens: session.tokens, user: user);
       }
     } on ApiException catch (e) {
+      if (e.statusCode == 401 && mounted) {
+        await _tokens.clear(clearBiometric: true);
+        if (mounted) state = null;
+        return;
+      }
       if (attempt == 0 &&
           e.statusCode != 401 &&
           e.statusCode != 403 &&

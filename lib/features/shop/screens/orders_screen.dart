@@ -12,14 +12,58 @@ import '../data/shop_models.dart';
 import '../providers.dart';
 import '../widgets/driver_location_map.dart';
 
-class OrdersScreen extends ConsumerWidget {
-  const OrdersScreen({super.key});
+void _openOrderDetailSheet(BuildContext context, ShopOrder order) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) => _OrderDetailSheet(order: order),
+  );
+}
+
+class OrdersScreen extends ConsumerStatefulWidget {
+  const OrdersScreen({super.key, this.initialOrderId});
+
+  final String? initialOrderId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<OrdersScreen> createState() => _OrdersScreenState();
+}
+
+class _OrdersScreenState extends ConsumerState<OrdersScreen> {
+  bool _didOpenInitialOrder = false;
+
+  void _maybeOpenInitialOrder(List<ShopOrder>? orders) {
+    final targetId = widget.initialOrderId?.trim();
+    if (targetId == null ||
+        targetId.isEmpty ||
+        _didOpenInitialOrder ||
+        orders == null) {
+      return;
+    }
+    ShopOrder? matchedOrder;
+    for (final order in orders) {
+      if (order.id == targetId || order.reference == targetId) {
+        matchedOrder = order;
+        break;
+      }
+    }
+    if (matchedOrder == null) return;
+    _didOpenInitialOrder = true;
+    final selected = matchedOrder;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _openOrderDetailSheet(context, selected);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final ordersAsync = ref.watch(userOrdersProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final orders = ordersAsync.valueOrNull;
+    _maybeOpenInitialOrder(orders);
 
     final inTransit =
         orders
@@ -287,7 +331,7 @@ class _OrderCard extends ConsumerWidget {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () => _openOrderDetail(context, ref, order),
+          onTap: () => _openOrderDetailSheet(context, order),
           borderRadius: BorderRadius.circular(20),
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -413,16 +457,6 @@ class _OrderCard extends ConsumerWidget {
           ),
         ),
       ),
-    );
-  }
-
-  void _openOrderDetail(BuildContext context, WidgetRef ref, ShopOrder order) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _OrderDetailSheet(order: order),
     );
   }
 }

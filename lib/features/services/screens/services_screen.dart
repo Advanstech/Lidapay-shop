@@ -18,83 +18,211 @@ class ServicesScreen extends ConsumerStatefulWidget {
 class _ServicesScreenState extends ConsumerState<ServicesScreen> {
   String _selectedFilter = 'All';
 
-  List<
-    ({IconData icon, Color color, String title, String subtitle, String route})
+  static const List<
+    ({
+      String category,
+      IconData icon,
+      Color color,
+      String title,
+      String subtitle,
+      String route,
+    })
   >
-  get _filteredServices => switch (_selectedFilter) {
-    'Airtime' => [
-      (
-        icon: Icons.phone_android_rounded,
-        color: AppColors.primary,
-        title: 'Buy Airtime',
-        subtitle: 'Top up a Ghana mobile number',
-        route: AppRoutes.airtime,
+  _allServices = [
+    (
+      category: 'Airtime',
+      icon: Icons.phone_android_rounded,
+      color: AppColors.primary,
+      title: 'Buy Airtime',
+      subtitle: 'Top up a Ghana mobile number',
+      route: AppRoutes.airtime,
+    ),
+    (
+      category: 'Airtime',
+      icon: Icons.public_rounded,
+      color: AppColors.violet,
+      title: 'Global Airtime',
+      subtitle: 'Recharge international mobile numbers',
+      route: AppRoutes.globalAirtime,
+    ),
+    (
+      category: 'Data',
+      icon: Icons.wifi_rounded,
+      color: AppColors.violet,
+      title: 'Internet Data',
+      subtitle: 'Ghana bundles and worldwide data top-ups',
+      route: AppRoutes.data,
+    ),
+    (
+      category: 'Convert',
+      icon: Icons.swap_horiz_rounded,
+      color: AppColors.success,
+      title: 'Lida Value',
+      subtitle: 'Use, send, sell or convert your value',
+      route: AppRoutes.lidaValue,
+    ),
+    (
+      category: 'Others',
+      icon: Icons.stars_rounded,
+      color: AppColors.warning,
+      title: 'Lida Points',
+      subtitle: 'Earn and redeem loyalty rewards',
+      route: AppRoutes.lidaPoints,
+    ),
+    (
+      category: 'Others',
+      icon: Icons.card_giftcard_rounded,
+      color: AppColors.primary,
+      title: 'Invite & Earn',
+      subtitle: 'Refer friends and earn bonuses',
+      route: AppRoutes.inviteEarn,
+    ),
+    (
+      category: 'Others',
+      icon: Icons.support_agent_rounded,
+      color: AppColors.violet,
+      title: 'Support',
+      subtitle: 'Get help from our team',
+      route: AppRoutes.support,
+    ),
+  ];
+
+  List<
+    ({
+      String category,
+      IconData icon,
+      Color color,
+      String title,
+      String subtitle,
+      String route,
+    })
+  >
+  get _filteredServices => _selectedFilter == 'All'
+      ? const []
+      : _allServices.where((s) => s.category == _selectedFilter).toList();
+
+  Future<void> _openSearchSheet(BuildContext context) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
-      (
-        icon: Icons.public_rounded,
-        color: AppColors.violet,
-        title: 'Global Airtime',
-        subtitle: 'Recharge international mobile numbers',
-        route: AppRoutes.globalAirtime,
-      ),
-    ],
-    'Data' => [
-      (
-        icon: Icons.wifi_rounded,
-        color: AppColors.violet,
-        title: 'Internet Data',
-        subtitle: 'Ghana bundles and worldwide data top-ups',
-        route: AppRoutes.data,
-      ),
-    ],
-    'Convert' => [
-      (
-        icon: Icons.swap_horiz_rounded,
-        color: AppColors.success,
-        title: 'Lida Value',
-        subtitle: 'Use, send, sell or convert your value',
-        route: AppRoutes.lidaValue,
-      ),
-    ],
-    'Others' => [
-      (
-        icon: Icons.qr_code_scanner_rounded,
-        color: AppColors.primary,
-        title: 'QR Pay',
-        subtitle: 'Scan to pay',
-        route: AppRoutes.qrPay,
-      ),
-      (
-        icon: Icons.account_balance_rounded,
-        color: AppColors.navy,
-        title: 'GTPay',
-        subtitle: 'Bank payment services',
-        route: AppRoutes.gtPay,
-      ),
-      (
-        icon: Icons.stars_rounded,
-        color: AppColors.warning,
-        title: 'Lida Points',
-        subtitle: 'Earn and redeem loyalty rewards',
-        route: AppRoutes.lidaPoints,
-      ),
-      (
-        icon: Icons.card_giftcard_rounded,
-        color: AppColors.primary,
-        title: 'Invite & Earn',
-        subtitle: 'Refer friends and earn bonuses',
-        route: AppRoutes.inviteEarn,
-      ),
-      (
-        icon: Icons.support_agent_rounded,
-        color: AppColors.violet,
-        title: 'Support',
-        subtitle: 'Get help from our team',
-        route: AppRoutes.support,
-      ),
-    ],
-    _ => [],
-  };
+      builder: (sheetContext) {
+        var query = '';
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            final normalized = query.trim().toLowerCase();
+            final matches = normalized.isEmpty
+                ? _allServices
+                : _allServices
+                      .where(
+                        (s) =>
+                            s.title.toLowerCase().contains(normalized) ||
+                            s.subtitle.toLowerCase().contains(normalized) ||
+                            s.category.toLowerCase().contains(normalized),
+                      )
+                      .toList();
+            final scheme = Theme.of(ctx).colorScheme;
+            return Padding(
+              padding: EdgeInsets.fromLTRB(
+                20,
+                4,
+                20,
+                MediaQuery.viewInsetsOf(ctx).bottom + 20,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Search services',
+                    style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    autofocus: true,
+                    decoration: InputDecoration(
+                      hintText: 'Airtime, data, Lida Value, rewards…',
+                      prefixIcon: const Icon(Icons.search_rounded),
+                      filled: true,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                    onChanged: (value) => setSheetState(() => query = value),
+                  ),
+                  const SizedBox(height: 14),
+                  Flexible(
+                    child: matches.isEmpty
+                        ? Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 28),
+                            child: Center(
+                              child: Text(
+                                'No matching services found.',
+                                style: TextStyle(
+                                  color: scheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ),
+                          )
+                        : ListView.separated(
+                            shrinkWrap: true,
+                            itemCount: matches.length,
+                            separatorBuilder: (_, _) =>
+                                const SizedBox(height: 6),
+                            itemBuilder: (_, index) {
+                              final service = matches[index];
+                              return ListTile(
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                leading: Container(
+                                  width: 40,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    color: service.color.withValues(
+                                      alpha: 0.14,
+                                    ),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Icon(
+                                    service.icon,
+                                    color: service.color,
+                                  ),
+                                ),
+                                title: Text(
+                                  service.title,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                subtitle: Text(service.subtitle),
+                                trailing: const Icon(
+                                  Icons.chevron_right_rounded,
+                                ),
+                                onTap: () {
+                                  Navigator.of(sheetContext).pop();
+                                  context.push(service.route);
+                                },
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -133,7 +261,7 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen> {
                   padding: EdgeInsets.fromLTRB(20, topInset + 12, 20, 12),
                   child: _AirServicesTopBar(
                     onBack: () => context.go(AppRoutes.home),
-                    onSearch: () => context.push(AppRoutes.airtime),
+                    onSearch: () => _openSearchSheet(context),
                   ),
                 ),
               ),
@@ -297,17 +425,24 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen> {
                         ),
                         const SizedBox(width: 12),
                         _QuickActionPill(
-                          icon: Icons.qr_code_scanner_rounded,
-                          label: 'QR Pay',
-                          color: AppColors.primary,
-                          onTap: () => context.push(AppRoutes.qrPay),
+                          icon: Icons.stars_rounded,
+                          label: 'Rewards',
+                          color: AppColors.warning,
+                          onTap: () => context.push(AppRoutes.lidaPoints),
                         ),
                         const SizedBox(width: 12),
                         _QuickActionPill(
-                          icon: Icons.account_balance_rounded,
-                          label: 'GTPay',
+                          icon: Icons.card_giftcard_rounded,
+                          label: 'Referrals',
+                          color: AppColors.primary,
+                          onTap: () => context.push(AppRoutes.inviteEarn),
+                        ),
+                        const SizedBox(width: 12),
+                        _QuickActionPill(
+                          icon: Icons.local_shipping_outlined,
+                          label: 'My Orders',
                           color: AppColors.navy,
-                          onTap: () => context.push(AppRoutes.gtPay),
+                          onTap: () => context.push(AppRoutes.orders),
                         ),
                       ],
                     ),
@@ -466,13 +601,15 @@ class _AirServicesTopBar extends StatelessWidget {
                   fontWeight: FontWeight.w500,
                 ),
               ),
-              const Opacity(
-                opacity: 0,
-                child: SizedBox(
-                  height: 1,
-                  child: Text(
-                    'All services, one wallet',
-                    style: TextStyle(fontSize: 1),
+              const ExcludeSemantics(
+                child: Opacity(
+                  opacity: 0,
+                  child: SizedBox(
+                    height: 1,
+                    child: Text(
+                      'All services, one wallet',
+                      style: TextStyle(fontSize: 1),
+                    ),
                   ),
                 ),
               ),

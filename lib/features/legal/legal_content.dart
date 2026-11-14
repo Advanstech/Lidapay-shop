@@ -2,6 +2,8 @@
 /// meaningfully so existing users review the updated terms.
 library;
 
+import '../../core/constants/app_constants.dart';
+
 class PolicySection {
   const PolicySection(this.heading, this.body);
 
@@ -455,7 +457,7 @@ const aboutLidapay = PolicyDocument(
   id: 'about',
   title: 'About LidaPay',
   subtitle: 'Who we are and how to reach us',
-  updatedLabel: 'LidaPay mobile · Version 1.1.0',
+  updatedLabel: 'LidaPay mobile · Version ${AppConstants.appVersion}',
   sections: [
     PolicySection(
       'Our Service',

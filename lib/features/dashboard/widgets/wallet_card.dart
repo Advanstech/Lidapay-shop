@@ -71,7 +71,7 @@ class WalletCard extends ConsumerWidget {
                 children: [
                   GestureDetector(
                     behavior: HitTestBehavior.opaque,
-                    onTap: () => context.go(AppRoutes.lidaValue),
+                    onTap: () => context.push(AppRoutes.lidaValue),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -193,7 +193,7 @@ class WalletCard extends ConsumerWidget {
                               ? '•••'
                               : '${wallet.lidaValueUnits.toStringAsFixed(1)} LV',
                           label: 'Lida Value',
-                          onTap: () => context.go(AppRoutes.lidaValue),
+                          onTap: () => context.push(AppRoutes.lidaValue),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -203,7 +203,7 @@ class WalletCard extends ConsumerWidget {
                           iconColor: AppColors.warning,
                           value: hidden ? '•••' : '${wallet.lidaPoints}',
                           label: 'Points',
-                          onTap: () => context.go(AppRoutes.lidaPoints),
+                          onTap: () => context.push(AppRoutes.lidaPoints),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -225,7 +225,7 @@ class WalletCard extends ConsumerWidget {
                               ? '•••'
                               : Formatters.compact(totalVolume.round()),
                           label: 'Analytics',
-                          onTap: () => context.go(AppRoutes.historyAnalytics),
+                          onTap: () => context.push(AppRoutes.historyAnalytics),
                         ),
                       ),
                     ],

@@ -1,10 +1,34 @@
+import 'dart:async';
+
+import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:lidapay_app/core/deep_links.dart';
+import 'package:lidapay_app/core/router/app_router.dart';
 import 'package:lidapay_app/core/widgets/app_button.dart';
+import 'package:lidapay_app/features/auth/screens/login_screen.dart';
 import 'package:lidapay_app/features/dashboard/widgets/transaction_tile.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'helpers/mock_app.dart';
+
+class _FakeAppLinks implements AppLinks {
+  final _controller = StreamController<Uri>.broadcast();
+
+  @override
+  Stream<Uri> get uriLinkStream => _controller.stream;
+
+  @override
+  Future<Uri?> getInitialLink() async => null;
+
+  void emit(Uri uri) => _controller.add(uri);
+
+  Future<void> dispose() => _controller.close();
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
 
 void main() {
   testWidgets('cold start shows branded splash, then routes to onboarding', (
@@ -271,4 +295,44 @@ void main() {
 
     expect(find.text('Welcome back'), findsOneWidget);
   });
+
+  testWidgets(
+    'lidapay://auth/password-reset-complete routes to LoginScreen with confirmation',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({'onboarding_seen_v1': true});
+      await pumpMockApp(tester);
+      await tester.pumpAndSettle(const Duration(milliseconds: 100));
+
+      expect(find.byType(LoginScreen), findsOneWidget);
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(LoginScreen)),
+      );
+      final router = container.read(routerProvider);
+
+      // Push ForgotPasswordScreen while LoginScreen stays mounted beneath it.
+      router.push(AppRoutes.forgotPassword);
+      await tester.pumpAndSettle();
+      expect(find.text('Reset password'), findsOneWidget);
+
+      final fakeLinks = _FakeAppLinks();
+      addTearDown(fakeLinks.dispose);
+      final handler = PaymentDeepLinkHandler(
+        links: fakeLinks,
+        router: router,
+        hasSession: () => false,
+      );
+      addTearDown(handler.dispose);
+      await handler.start();
+
+      // Simulate returning via "Open LidaPay" deep link from browser reset form.
+      fakeLinks.emit(Uri.parse('lidapay://auth/password-reset-complete'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Welcome back'), findsOneWidget);
+      expect(
+        find.text('Password updated. Sign in with your new password.'),
+        findsOneWidget,
+      );
+    },
+  );
 }

@@ -1282,7 +1282,6 @@ class RemoteServicesRepository implements ServicesRepository {
 
   /// `lida-value-wallet/*` is the spec's fallback pair for the main routes.
   Future<(double, double)> _lidaValueBalance() async {
-    Object? lastError;
     for (final path in const [
       ApiEndpoints.lidaValueBalance,
       ApiEndpoints.lidaValueBalanceFallback,
@@ -1290,12 +1289,10 @@ class RemoteServicesRepository implements ServicesRepository {
       try {
         return _lidaValueBalanceFrom(await _api.getRaw(path));
       } on ApiException catch (error) {
-        lastError = error;
+        if (error.statusCode == 401) rethrow;
       }
     }
-    throw lastError is ApiException
-        ? lastError
-        : const ApiException('Lida Value balance is unavailable right now.');
+    return (0.0, 0.0);
   }
 
   @override
@@ -1423,21 +1420,45 @@ class RemoteServicesRepository implements ServicesRepository {
 
   @override
   Future<LidaPointsWallet> getLidaPointsWallet() async {
-    final raw = await _api.getRaw(ApiEndpoints.lidapointsBalance);
-    final pool = payloadPool(asMap(raw));
-    final balance =
-        (raw is num
-                ? raw.toDouble()
-                : numberField(pool, const ['balance', 'points', 'totalPoints']))
-            ?.round() ??
-        0;
+    final (balance, redeemableValue) = await _lidaPointsBalance();
     return LidaPointsWallet(
       balance: balance,
-      redeemableValue:
-          numberField(pool, const ['redeemableValue', 'cashValue', 'value']) ??
-          balance / 200,
+      redeemableValue: redeemableValue ?? balance / 200,
       history: await _history(ApiEndpoints.lidapointsHistory),
     );
+  }
+
+  Future<(int, double?)> _lidaPointsBalance() async {
+    for (final path in const [
+      ApiEndpoints.lidapointsBalance,
+      ApiEndpoints.points,
+    ]) {
+      try {
+        final parsed = _pointsFromRaw(await _api.getRaw(path));
+        if (parsed != null) return parsed;
+      } on ApiException catch (error) {
+        if (error.statusCode == 401) rethrow;
+      }
+    }
+    return (0, null);
+  }
+
+  (int, double?)? _pointsFromRaw(Object? raw) {
+    if (raw is num) return (raw.round(), null);
+    if (raw is String) {
+      final parsed = num.tryParse(raw.trim());
+      if (parsed != null) return (parsed.round(), null);
+      return null;
+    }
+    final pool = payloadPool(asMap(raw));
+    final balance = numberField(pool, const ['balance', 'points', 'totalPoints']);
+    if (balance == null) return null;
+    final redeemable = numberField(pool, const [
+      'redeemableValue',
+      'cashValue',
+      'value',
+    ]);
+    return (balance.round(), redeemable);
   }
 
   @override

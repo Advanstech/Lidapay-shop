@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/device/device_identity.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/providers/theme_provider.dart';
 import '../../../core/router/app_router.dart';
@@ -182,35 +183,104 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     setState(() => _isPreparingDeletionRequest = true);
     try {
       final user = ref.read(authSessionProvider)?.user;
+      final email = user?.email ?? '';
+      final phoneNumber = user?.phoneNumber ?? '';
       final launched = await launchUrl(
-        accountDeletionRequestUri(
-          email: user?.email ?? '',
-          phoneNumber: user?.phoneNumber ?? '',
-        ),
+        accountDeletionRequestUri(email: email, phoneNumber: phoneNumber),
         mode: LaunchMode.externalApplication,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            launched
-                ? 'Email app opened. Send the message to submit your request.'
-                : 'Could not open email. Contact $supportEmail to request account deletion.',
+      if (launched) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Email app opened. Send the message to submit your request.',
+            ),
           ),
-        ),
-      );
+        );
+      } else {
+        await _showManualDeletionFallbackDialog(
+          email: email,
+          phoneNumber: phoneNumber,
+        );
+      }
     } on PlatformException {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Could not open email. Contact info@advansistechnologies.com to request account deletion.',
-          ),
-        ),
+      final user = ref.read(authSessionProvider)?.user;
+      await _showManualDeletionFallbackDialog(
+        email: user?.email ?? '',
+        phoneNumber: user?.phoneNumber ?? '',
       );
     } finally {
       if (mounted) setState(() => _isPreparingDeletionRequest = false);
     }
+  }
+
+  Future<void> _showManualDeletionFallbackDialog({
+    required String email,
+    required String phoneNumber,
+  }) async {
+    final requestUri = accountDeletionRequestUri(
+      email: email,
+      phoneNumber: phoneNumber,
+    );
+    final requestBody = requestUri.queryParameters['body'] ?? '';
+    final fullText =
+        'To: $supportEmail\n'
+        'Subject: ${requestUri.queryParameters['subject'] ?? 'LidaPay account deletion request'}\n\n'
+        '$requestBody';
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Submit deletion request'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'No email app was available on this device. Send the request '
+                'below to $supportEmail from your registered email address:',
+              ),
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Theme.of(ctx).colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: SelectableText(
+                  requestBody,
+                  style: Theme.of(ctx).textTheme.bodySmall,
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Close'),
+          ),
+          FilledButton.icon(
+            onPressed: () async {
+              await Clipboard.setData(ClipboardData(text: fullText));
+              if (!ctx.mounted) return;
+              Navigator.of(ctx).pop();
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Deletion request copied to clipboard.'),
+                ),
+              );
+            },
+            icon: const Icon(Icons.copy_rounded, size: 16),
+            label: const Text('Copy request details'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -220,6 +290,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     ref.watch(profileSyncProvider);
     final user = ref.watch(authSessionProvider)?.user;
     final wallet = ref.watch(walletSummaryProvider);
+    final identity = ref.watch(deviceIdentityProvider);
+    final versionLabel =
+        identity.buildNumber != '0' && identity.buildNumber.isNotEmpty
+        ? 'LidaPay v${identity.appVersion} (${identity.buildNumber})'
+        : 'LidaPay v${identity.appVersion}';
     final themeMode = ref.watch(themeModeProvider);
     final scheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -482,7 +557,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             SliverToBoxAdapter(
               child: Center(
                 child: Text(
-                  'Lidapay 2.0 · Milestone 2 build',
+                  versionLabel,
                   style: Theme.of(context).textTheme.labelSmall
                       ?.copyWith(color: scheme.onSurfaceVariant),
                 ),
@@ -694,9 +769,11 @@ class _ProfileBrandHero extends StatelessWidget {
                                   width: 1.5,
                                 ),
                               ),
-                              child: const Icon(
-                                Icons.verified_rounded,
-                                size: 14,
+                              child: Icon(
+                                verified
+                                    ? Icons.verified_rounded
+                                    : Icons.edit_rounded,
+                                size: 13,
                                 color: AppColors.primary,
                               ),
                             ),

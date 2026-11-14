@@ -2,6 +2,7 @@ import 'package:equatable/equatable.dart';
 
 import '../../../core/network/api_payload.dart';
 import '../../../core/utils/formatters.dart';
+import '../../auth/data/auth_models.dart';
 
 /// The delivery channels the backend stores in `type` when the record is a
 /// plain channel dispatch. Anything else in `type` is an event name (e.g.
@@ -27,6 +28,8 @@ class AppNotification extends Equatable {
     this.kind = 'general',
     this.data = const <String, dynamic>{},
     this.isRead = false,
+    this.userId,
+    this.mergedIds = const <String>{},
   });
 
   final String id;
@@ -55,8 +58,50 @@ class AppNotification extends Equatable {
   /// Local-only read flag merged in by the provider.
   final bool isRead;
 
+  /// Optional owner identifier returned by the backend (`userId`, `recipient`, etc.).
+  final String? userId;
+
+  /// All raw notification IDs represented by this card (including duplicates
+  /// merged across delivery channels within the deduplication window).
+  final Set<String> mergedIds;
+
   /// Whether this notification is waiting on the recipient's choice.
   bool get needsAction => kind == 'decision';
+
+  /// Returns true if this notification is addressed to [user] or is unscoped.
+  bool belongsToUser(UserProfile? user) {
+    final rawTarget = userId?.trim() ?? '';
+    if (rawTarget.isEmpty || user == null) return true;
+    final uid = user.id.trim().toLowerCase();
+    final email = user.email.trim().toLowerCase();
+    final phone = user.phoneNumber.trim();
+    final username = user.username.trim().toLowerCase();
+    if (uid.isEmpty && email.isEmpty && phone.isEmpty && username.isEmpty) {
+      return true;
+    }
+
+    final target = rawTarget.toLowerCase();
+    if (target == uid && uid.isNotEmpty) return true;
+    if (target == email && email.isNotEmpty) return true;
+    if (target == username && username.isNotEmpty) return true;
+
+    if (!target.contains('@')) {
+      if (_samePhone(target, phone)) return true;
+      if (!username.contains('@') && _samePhone(target, username)) return true;
+    }
+    return false;
+  }
+
+  static bool _samePhone(String a, String b) {
+    final da = a.replaceAll(RegExp(r'\D'), '');
+    final db = b.replaceAll(RegExp(r'\D'), '');
+    if (da.isEmpty || db.isEmpty) return false;
+    if (da == db) return true;
+    if (da.length >= 9 && db.length >= 9) {
+      return da.substring(da.length - 9) == db.substring(db.length - 9);
+    }
+    return false;
+  }
 
   /// Human-friendly title: server subject, else derived from the event.
   String get displayTitle {
@@ -139,23 +184,40 @@ class AppNotification extends Equatable {
     return 'airtime';
   }
 
-  AppNotification copyWith({bool? isRead}) => AppNotification(
-    id: id,
-    title: title,
-    message: message,
-    channel: channel,
-    status: status,
-    createdAt: createdAt,
-    eventType: eventType,
-    kind: kind,
-    data: data,
-    isRead: isRead ?? this.isRead,
-  );
+  AppNotification copyWith({bool? isRead, Set<String>? mergedIds}) =>
+      AppNotification(
+        id: id,
+        title: title,
+        message: message,
+        channel: channel,
+        status: status,
+        createdAt: createdAt,
+        eventType: eventType,
+        kind: kind,
+        data: data,
+        isRead: isRead ?? this.isRead,
+        userId: userId,
+        mergedIds: mergedIds ?? this.mergedIds,
+      );
+
+  static String _extractId(Map<String, dynamic> pool) {
+    for (final key in const ['_id', 'id', 'notificationId', 'ref']) {
+      final value = pool[key];
+      if (value == null) continue;
+      if (value is Map) {
+        final oid = value[r'$oid']?.toString().trim() ?? '';
+        if (oid.isNotEmpty && oid != 'null') return oid;
+        continue;
+      }
+      final text = value.toString().trim();
+      if (text.isNotEmpty && text != 'null') return text;
+    }
+    return '';
+  }
 
   factory AppNotification.fromApiJson(Map<String, dynamic> json) {
     final pool = payloadPool(json);
-    final id =
-        stringField(pool, const ['_id', 'id', 'notificationId', 'ref']) ?? '';
+    final rawId = _extractId(pool);
 
     // `type` is ambiguous: channel dispatches use email/sms/push, but push
     // records may store the event name there. Split it accordingly.
@@ -202,29 +264,44 @@ class AppNotification extends Equatable {
         ]) ??
         '';
     final message = _sanitizeMessage(rawMessage);
+    final createdAt =
+        dateField(pool, const [
+          'createdAt',
+          'created_at',
+          'date',
+          'timestamp',
+          'sentAt',
+        ]) ??
+        DateTime.fromMillisecondsSinceEpoch(0);
+    final id = rawId.isNotEmpty
+        ? rawId
+        : 'notif_${channel}_${createdAt.millisecondsSinceEpoch}_${title.hashCode}_${message.hashCode}';
+    final userId =
+        stringField(pool, const ['userId', 'recipientId', 'recipient', 'to']) ??
+        stringField(data, const [
+          'userId',
+          'recipientId',
+          'recipient',
+          'recipientPhone',
+        ]);
+    final status = stringField(pool, const ['status', 'state']) ?? 'sent';
 
     return AppNotification(
       id: id,
       title: title,
       message: message,
       channel: channel,
-      status: stringField(pool, const ['status', 'state']) ?? 'sent',
-      createdAt:
-          dateField(pool, const [
-            'createdAt',
-            'created_at',
-            'date',
-            'timestamp',
-            'sentAt',
-          ]) ??
-          DateTime.fromMillisecondsSinceEpoch(0),
+      status: status,
+      createdAt: createdAt,
       eventType: eventType,
       kind: _kindOf(eventType, title, message, data),
       data: data,
       isRead:
           pool['isRead'] == true ||
           pool['read'] == true ||
-          pool['readAt'] != null,
+          pool['readAt'] != null ||
+          status.toLowerCase() == 'read',
+      userId: userId,
     );
   }
 
@@ -288,5 +365,7 @@ class AppNotification extends Equatable {
     eventType,
     kind,
     isRead,
+    userId,
+    mergedIds,
   ];
 }

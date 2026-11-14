@@ -8,7 +8,9 @@ import 'package:lidapay_app/core/network/api_exception.dart';
 import 'package:lidapay_app/core/network/token_store.dart';
 import 'package:lidapay_app/features/auth/data/auth_models.dart';
 import 'package:lidapay_app/features/auth/data/remote_auth_repository.dart';
+import 'package:lidapay_app/features/dashboard/data/dashboard_models.dart';
 import 'package:lidapay_app/features/dashboard/data/remote_dashboard_repository.dart';
+import 'package:lidapay_app/features/history/data/remote_history_repository.dart';
 import 'package:lidapay_app/features/notifications/data/notification_models.dart';
 import 'package:lidapay_app/features/services/data/remote_services_repository.dart';
 import 'package:lidapay_app/features/services/data/service_models.dart';
@@ -1809,5 +1811,139 @@ void main() {
       final body = adapter.requests.last.data as Map;
       expect(body['userName'], '0593998216');
     });
+
+    test(
+      'otp verify skips undefined JWT sub and recovers userId claim',
+      () async {
+        final payload = base64UrlEncode(
+          utf8.encode(
+            jsonEncode({'sub': 'undefined', 'userId': '694abae5d474016f3985cdaf'}),
+          ),
+        ).replaceAll('=', '');
+        final token = 'e30.$payload.sig';
+        final (api, _) = await _client(
+          (_) => {
+            'access_token': token,
+            'refresh_token': 'refresh-1',
+            'user': {'id': 'undefined'},
+          },
+        );
+        SharedPreferences.setMockInitialValues({});
+        final prefs = await SharedPreferences.getInstance();
+        final repo = RemoteAuthRepository(api, TokenStore(prefs));
+
+        final session = await repo.verifyLoginOtp(
+          const OtpVerifyRequest(
+            challengeToken: 'challenge-1',
+            otpCode: '123456',
+            username: '0593998216',
+          ),
+        );
+
+        expect(session.user.id, '694abae5d474016f3985cdaf');
+      },
+    );
+
+    test(
+      'restoreSession clears cached pre-fix OTP sessions with undefined sub',
+      () async {
+        final payload = base64UrlEncode(
+          utf8.encode(jsonEncode({'sub': 'undefined'})),
+        ).replaceAll('=', '');
+        final token = 'e30.$payload.sig';
+        final (api, _) = await _client((_) => {});
+        SharedPreferences.setMockInitialValues({});
+        final prefs = await SharedPreferences.getInstance();
+        final store = TokenStore(prefs);
+        await store.saveSession(
+          accessToken: token,
+          refreshToken: 'refresh-1',
+          profile: {'id': 'undefined', 'username': '0593998216'},
+        );
+        await store.saveBiometricSession();
+
+        final restored = await RemoteAuthRepository(api, store).restoreSession();
+
+        expect(restored, isNull);
+        expect(store.hasSession, isFalse);
+        expect(await store.hasBiometricSession, isFalse);
+      },
+    );
+
+    test(
+      'history loads JWT-scoped feeds when userId is empty and survives 500s',
+      () async {
+        final (api, adapter) = await _client(
+          (options) {
+            if (options.path == '/api/v1/users/account') {
+              return {'message': 'Internal server error'};
+            }
+            if (options.path == '/api/v1/lida-value/history') {
+              return {
+                'data': [
+                  {
+                    '_id': 'lv-1',
+                    'transactionReference': 'LV-REF-1',
+                    'type': 'save',
+                    'valueUnits': 5,
+                    'direction': 'credit',
+                    'createdAt': '2026-10-18T12:00:00.000Z',
+                  },
+                ],
+              };
+            }
+            if (options.path == '/api/v1/shop/orders') {
+              return <Object>[];
+            }
+            if (options.path == '/api/v1/lidapoints/history') {
+              return <Object>[];
+            }
+            return {};
+          },
+          status: (options) =>
+              options.path == '/api/v1/users/account' ? 500 : 200,
+        );
+
+        final items = await RemoteHistoryRepository(api, '').getTransactions();
+
+        expect(items, hasLength(1));
+        expect(items.single.reference, 'LV-REF-1');
+        expect(items.single.type, TransactionType.lidaValue);
+        expect(
+          adapter.requests.any((r) => r.path.contains('/transactions/user/')),
+          isFalse,
+        );
+      },
+    );
+
+    test(
+      'Lida Value and Lida Points wallets fall back cleanly on 500 errors',
+      () async {
+        final (valueApi, _) = await _client(
+          (_) => {'message': 'Internal server error'},
+          status: (options) =>
+              options.path.contains('balance') ? 500 : 200,
+        );
+        final lvWallet = await RemoteServicesRepository(
+          valueApi,
+        ).getLidaValueWallet();
+        expect(lvWallet.balance, 0);
+        expect(lvWallet.pending, 0);
+
+        final (pointsApi, _) = await _client(
+          (options) {
+            if (options.path == '/api/v1/users/points') return 42;
+            if (options.path == '/api/v1/lidapoints/history') return <Object>[];
+            return {'message': 'Internal server error'};
+          },
+          status: (options) =>
+              options.path == '/api/v1/lidapoints/balance' ? 500 : 200,
+        );
+        final lpWallet = await RemoteServicesRepository(
+          pointsApi,
+        ).getLidaPointsWallet();
+        expect(lpWallet.balance, 42);
+      },
+    );
   });
 }

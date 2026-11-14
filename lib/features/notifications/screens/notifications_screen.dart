@@ -32,6 +32,7 @@ class NotificationsScreen extends ConsumerWidget {
     final allKeys = <String>{};
     for (final n in items) {
       allKeys.add(n.id);
+      allKeys.addAll(n.mergedIds);
       allKeys.add('${n.kind}|${n.displayMessage}');
     }
     await ref.read(readNotificationsProvider.notifier).markAll(allKeys);
@@ -42,12 +43,19 @@ class NotificationsScreen extends ConsumerWidget {
     WidgetRef ref,
     AppNotification n,
   ) async {
-    final key = '${n.kind}|${n.displayMessage}';
-    ref.read(readNotificationsProvider.notifier).markRead(
+    final decisionId = n.data['decisionId']?.toString().trim();
+    await ref.read(readNotificationsProvider.notifier).markRead(
       n.id,
-      relatedKeys: [key],
+      relatedKeys: [
+        ...n.mergedIds,
+        if (decisionId != null && decisionId.isNotEmpty) ...[
+          'decision_$decisionId',
+          'decision|$decisionId',
+        ],
+      ],
     );
-    await showModalBottomSheet<void>(
+    if (!context.mounted) return;
+    final targetRoute = await showModalBottomSheet<String>(
       context: context,
       useRootNavigator: true,
       isScrollControlled: true,
@@ -56,6 +64,14 @@ class NotificationsScreen extends ConsumerWidget {
         notification: n.copyWith(isRead: true),
       ),
     );
+    if (targetRoute == null || !context.mounted) return;
+    if (targetRoute.startsWith('/shop/orders') ||
+        targetRoute == AppRoutes.lidaValue ||
+        targetRoute.startsWith('/recipient-decision/')) {
+      context.push(targetRoute);
+    } else {
+      context.go(targetRoute);
+    }
   }
 
   Future<void> _dismiss(
@@ -63,11 +79,13 @@ class NotificationsScreen extends ConsumerWidget {
     WidgetRef ref,
     AppNotification n,
   ) async {
+    final idsToDismiss = {n.id, ...n.mergedIds};
     final dismissed = ref.read(dismissedNotificationsProvider);
     ref.read(dismissedNotificationsProvider.notifier).state = {
       ...dismissed,
-      n.id,
+      ...idsToDismiss,
     };
+    ref.read(readNotificationsProvider.notifier).markAll(idsToDismiss);
     ScaffoldMessenger.of(context)
         .showSnackBar(const SnackBar(content: Text('Notification removed')));
     try {
@@ -76,7 +94,7 @@ class NotificationsScreen extends ConsumerWidget {
       // Bring it back if the delete failed server-side.
       final current = ref.read(dismissedNotificationsProvider);
       ref.read(dismissedNotificationsProvider.notifier).state = current
-          .difference({n.id});
+          .difference(idsToDismiss);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Could not delete. Try again.')),
@@ -88,8 +106,7 @@ class NotificationsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final notifications = ref.watch(notificationsProvider);
-    final unread =
-        notifications.valueOrNull?.where((n) => !n.isRead).length ?? 0;
+    final unread = ref.watch(unreadNotificationsProvider);
 
     return Scaffold(
       body: Column(
@@ -540,10 +557,18 @@ class _NotificationDetailSheet extends StatelessWidget {
           route: AppRoutes.history,
         );
       case 'order':
+        final orderId =
+            (notification.data['orderId'] ?? notification.data['shopOrderId'])
+                ?.toString()
+                .trim();
         return (
-          label: 'Open the shop',
+          label: orderId != null && orderId.isNotEmpty
+              ? 'Track your order'
+              : 'View my orders',
           icon: Icons.shopping_bag_outlined,
-          route: AppRoutes.shop,
+          route: orderId != null && orderId.isNotEmpty
+              ? AppRoutes.orderDetail(orderId)
+              : AppRoutes.orders,
         );
       case 'wallet':
         return (
@@ -692,8 +717,7 @@ class _NotificationDetailSheet extends StatelessWidget {
                                 size: 18,
                               ),
                               onPressed: () {
-                                Navigator.of(context).pop();
-                                context.push(
+                                Navigator.of(context).pop(
                                   AppRoutes.recipientDecision(_decisionId!),
                                 );
                               },
@@ -708,8 +732,7 @@ class _NotificationDetailSheet extends StatelessWidget {
                                 size: 18,
                               ),
                               onPressed: () {
-                                Navigator.of(context).pop();
-                                context.go(cta.route);
+                                Navigator.of(context).pop(cta.route);
                               },
                             ),
                           ],

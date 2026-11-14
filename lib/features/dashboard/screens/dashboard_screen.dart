@@ -30,11 +30,13 @@ class DashboardScreen extends ConsumerWidget {
     ref.invalidate(walletSummaryProvider);
     ref.invalidate(recentTransactionsProvider);
     ref.invalidate(flashDealsProvider);
+    ref.invalidate(rawNotificationsProvider);
     try {
       await Future.wait([
         ref.read(walletSummaryProvider.future),
         ref.read(recentTransactionsProvider.future),
         ref.read(flashDealsProvider.future),
+        ref.read(rawNotificationsProvider.future),
       ]);
     } catch (_) {
       // Sections surface their own state; the refresh gesture still ends.

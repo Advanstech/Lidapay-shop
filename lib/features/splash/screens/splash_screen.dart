@@ -36,7 +36,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
   Future<void> _route() async {
     final seen = await hasSeenOnboarding();
-    await ref.read(authSessionProvider.notifier).restore();
+    final notifier = ref.read(authSessionProvider.notifier);
+    if (!notifier.didAttemptRestore) {
+      await notifier.restore();
+    }
     if (!mounted) return;
     final hasSession = ref.read(authSessionProvider) != null;
     if (hasSession) {

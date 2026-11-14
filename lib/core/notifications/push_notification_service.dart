@@ -191,6 +191,7 @@ class PushNotificationService {
   }
 
   Future<void> _showForegroundNotification(RemoteMessage message) async {
+    _ref.invalidate(rawNotificationsProvider);
     final notification = message.notification;
     final title = notification?.title ?? message.data['title']?.toString() ?? 'LidaPay';
     final body = notification?.body ?? message.data['body']?.toString() ?? '';
@@ -235,7 +236,9 @@ class PushNotificationService {
     try {
       final data = jsonDecode(rawPayload) as Map<String, dynamic>;
       final notifId =
-          data['notificationId']?.toString() ?? data['id']?.toString();
+          data['_id']?.toString() ??
+          data['notificationId']?.toString() ??
+          data['id']?.toString();
       if (notifId != null && notifId.isNotEmpty) {
         _ref.read(readNotificationsProvider.notifier).markRead(notifId);
       }

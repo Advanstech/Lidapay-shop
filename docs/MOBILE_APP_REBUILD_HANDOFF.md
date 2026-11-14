@@ -203,10 +203,43 @@ Content-Type: application/json
 }
 ```
 
-Expect HTTP 200 with `access_token`, `refresh_token`, and `user` (including
-`user._id`). Save both tokens in secure storage, attach the access token to
-authenticated requests, then register the latest FCM token at
-`POST /api/v1/notifications/device-token` and load the authenticated home data.
+Expect HTTP `200` with `access_token`, `refresh_token`, and the full `user`
+object matching `POST /api/v1/users/login`:
+
+```json
+{
+  "access_token": "<jwt>",
+  "refresh_token": "<jwt>",
+  "user": {
+    "_id": "673ba0e3f2c001e4dcee976e",
+    "username": "0593998216",
+    "firstName": "Kofi",
+    "lastName": "Mensah",
+    "email": "user@example.com",
+    "phoneNumber": "0593998216",
+    "roles": ["user"],
+    "emailVerified": true,
+    "phoneVerified": false
+  }
+}
+```
+
+`verify-otp` signs `access_token` and `refresh_token` with the exact same JWT
+payload structure (`sub: String(user._id)`, `username`, `email`, `roles`) as
+password login, so `GET /api/v1/users/profile`, `GET /api/v1/users/wallet/user`,
+`GET /api/v1/users/account`, `GET /api/v1/lida-value/balance`,
+`GET /api/v1/lidapoints/balance`, and `GET /api/v1/transactions/user/:userId`
+behave identically across both sign-in methods. Save both tokens in secure
+storage, attach the access token to authenticated requests, then register the
+latest FCM token at `POST /api/v1/notifications/device-token` and load the
+authenticated home data.
+
+Note: The backend `JwtAuthGuard` rejects any token with a missing or invalid
+`sub` claim (including pre-fix cached OTP tokens where `sub` was `"undefined"`)
+with HTTP `401` (`"Invalid token payload"`). Any test device still holding an
+older OTP session should log out (or clear local session storage) and sign in
+again to obtain a fresh token.
+
 If verification returns an invalid/expired OTP or challenge, keep the user on
 the OTP screen and let them restart the login challenge; do not create a
 partially authenticated session.

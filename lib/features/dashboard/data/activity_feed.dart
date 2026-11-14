@@ -39,18 +39,19 @@ class ActivityFeed {
 
   /// GET /api/v1/transactions/user/{userId} — the primary ledger.
   Future<List<Transaction>> _ledger(int limit) async {
+    final id = _userId.trim();
+    if (id.isEmpty || id == 'undefined' || id == 'null') return const [];
     try {
-      final data = await _api.get(
-        ApiEndpoints.userTransactions(_userId),
+      final raw = await _api.getRaw(
+        ApiEndpoints.userTransactions(id),
         queryParameters: {'page': 1, 'limit': limit},
       );
-      final rows = data['transactions'];
-      if (rows is! List) return const [];
-      return rows
-          .whereType<Map>()
-          .map((row) => Transaction.fromApiJson(Map<String, dynamic>.from(row)))
-          .toList();
-    } on ApiException {
+      final rows = _extractListRows(
+        raw,
+        const ['transactions', 'data', 'items', 'results', 'records'],
+      );
+      return rows.map(Transaction.fromApiJson).toList();
+    } catch (_) {
       return const [];
     }
   }
@@ -60,11 +61,10 @@ class ActivityFeed {
   /// wallet deposits/withdrawals the shared ledger may miss.
   Future<List<Transaction>> _accountActivity() async {
     try {
-      final data = await _api.get(ApiEndpoints.userAccount);
-      final rows = data['transactions'];
-      if (rows is! List) return const [];
-      return rows.whereType<Map>().map((row) {
-        final map = Map<String, dynamic>.from(row);
+      final raw = await _api.getRaw(ApiEndpoints.userAccount);
+      final rows = _extractListRows(raw, const ['transactions']);
+      if (rows.isEmpty) return const [];
+      return rows.map((map) {
         final pool = payloadPool(map);
         final rawType =
             stringField(pool, const [
@@ -127,9 +127,26 @@ class ActivityFeed {
           isCredit: isCredit,
         );
       }).toList();
-    } on ApiException {
+    } catch (_) {
       return const [];
     }
+  }
+
+  /// Extracts a list of map rows from either a top-level List or a named
+  /// list field inside a response Map, avoiding wrapping bare metadata objects.
+  static List<Map<String, dynamic>> _extractListRows(
+    Object? raw,
+    List<String> keys,
+  ) {
+    if (raw is List) return rowsOf(raw);
+    if (raw is Map) {
+      final pool = payloadPool(asMap(raw));
+      for (final key in keys) {
+        final value = pool[key];
+        if (value is List) return rowsOf(value);
+      }
+    }
+    return const [];
   }
 
   /// GET /api/v1/lida-value/history — wallet actions that may never reach
