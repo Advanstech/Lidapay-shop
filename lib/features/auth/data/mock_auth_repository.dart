@@ -68,12 +68,6 @@ class MockAuthRepository implements AuthRepository {
   Future<OtpChallengeResponse> requestLoginOtp(
     OtpChallengeRequest request,
   ) async {
-    if (request.password == 'wrongpass') {
-      throw const ApiException(
-        'Incorrect password. Please try again.',
-        code: 'INVALID_CREDENTIALS',
-      );
-    }
     return OtpChallengeResponse(
       challengeToken: 'mock-challenge-${request.username}',
       message: 'Verification code sent to ${request.username}',

@@ -163,7 +163,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       if (!mounted) return;
       if (email) {
         _notify(
-          'Verification email sent. Check your inbox for the link.',
+          'Verification email sent — check your inbox for the link. '
+          'If it expired, request another.',
           isError: false,
         );
       } else {

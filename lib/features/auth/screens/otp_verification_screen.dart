@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/router/app_router.dart';
+import '../../../core/utils/formatters.dart';
 import '../../../core/utils/validators.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/auth_hero_header.dart';
@@ -191,7 +192,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
                   Center(
                     child: _cooldown > 0
                         ? Text(
-                            'Resend code in 0:${_cooldown.toString().padLeft(2, '0')}',
+                            'Resend code in ${Formatters.countdown(_cooldown)}',
                             style: TextStyle(color: scheme.onSurfaceVariant),
                           )
                         : TextButton(

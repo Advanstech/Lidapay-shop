@@ -1383,7 +1383,7 @@ class _EnhancedInternetDataWizardState
           ? Formatters.currency(bundle?.price ?? 0)
           : '$_globalAmountCurrency ${_amountValue.toStringAsFixed(2)}',
       orderSummary: 'Internet data · $recipientDigits',
-      registeredNumber: user?.phoneNumber ?? '',
+      registeredNumber: user?.contactPhone ?? '',
     );
     if (!mounted || choice == null) {
       if (mounted) setState(() => _submitting = false);

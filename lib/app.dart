@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -86,10 +87,15 @@ class _LidapayAppState extends ConsumerState<LidapayApp>
 
   /// Returning from the ExpressPay browser, biometrics, or a permission
   /// dialog can re-inset the window on Samsung/Huawei devices — keep the
-  /// app edge-to-edge like other modern apps.
+  /// app edge-to-edge like other modern apps. Also refresh the profile so
+  /// verification flags (e.g. an email link opened in the browser) and
+  /// other server-side state are current when the user comes back.
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _applyEdgeToEdge();
+    if (state == AppLifecycleState.resumed) {
+      _applyEdgeToEdge();
+      unawaited(ref.read(authSessionProvider.notifier).refreshProfile());
+    }
   }
 
   void _applyEdgeToEdge() {

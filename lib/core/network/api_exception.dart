@@ -30,12 +30,22 @@ class ApiException implements Exception {
   /// provider token minting, stack fragments). Translate the opaque ones so
   /// error screens stay actionable instead of parroting internals.
   static String? _friendly(String? message, int? statusCode) {
-    if (message == null) {
-      return (statusCode ?? 0) >= 500
-          ? 'The service is temporarily unavailable. Please try again shortly.'
-          : null;
+    final lower = message?.toLowerCase();
+    if ((statusCode ?? 0) >= 500 &&
+        (lower == null || lower == 'internal server error')) {
+      return 'The service is temporarily unavailable. Please try again shortly.';
     }
-    final lower = message.toLowerCase();
+    if (message == null) {
+      return null;
+    }
+    // Backend auth messages are written for integrators, not customers.
+    if (lower!.contains('invalid login identifier')) {
+      return 'We couldn\'t find an account with that email or phone number. '
+          'Check it and try again, or create an account.';
+    }
+    if (statusCode == 401 && lower == 'unauthorized') {
+      return 'Incorrect phone, email, or password. Please try again.';
+    }
     if (lower.contains('access token') || lower.contains('accesstoken')) {
       return 'This service is temporarily unavailable. Please try again shortly.';
     }

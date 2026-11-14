@@ -28,6 +28,20 @@ class RemoteServicesRepository implements ServicesRepository {
   final String? _userName;
   final String? _userPhone;
 
+  /// The OTP verify response can carry JS-serialized `undefined`/`null`
+  /// literals for identity fields — those poison endpoints that require a
+  /// real user id. Treat them as absent rather than sending them.
+  static String? _usable(String? value) {
+    final v = value?.trim();
+    if (v == null || v.isEmpty || v == 'undefined' || v == 'null') {
+      return null;
+    }
+    return v;
+  }
+
+  String? get _effectiveUserId => _usable(_userId);
+  String? get _effectiveUserName => _usable(_userName) ?? _usable(_userPhone);
+
   /// Catalogue data (countries, operators, bundles) changes rarely, so every
   /// successful payload is persisted and the stale copy is served when the
   /// live call fails — a provider outage can't dead-end the wizard once the
@@ -1040,8 +1054,8 @@ class RemoteServicesRepository implements ServicesRepository {
         // USE self-topup bypasses the recipient-decision flow on the backend;
         // SEND top-ups leave it false so a registered recipient can choose.
         'isSelfTopup': isSelfTopup,
-        if (_userId != null) 'userId': _userId,
-        if (_userName != null) 'userName': _userName,
+        if (_effectiveUserId != null) 'userId': _effectiveUserId,
+        if (_effectiveUserName != null) 'userName': _effectiveUserName,
       },
     );
     return _receipt(
@@ -1073,9 +1087,9 @@ class RemoteServicesRepository implements ServicesRepository {
     final raw = await _api.postRaw(
       ApiEndpoints.internetBuydata,
       body: {
-        if (_userId != null) 'id': _userId,
-        if (_userId != null) 'userId': _userId,
-        if (_userName != null) 'userName': _userName,
+        if (_effectiveUserId != null) 'id': _effectiveUserId,
+        if (_effectiveUserId != null) 'userId': _effectiveUserId,
+        if (_effectiveUserName != null) 'userName': _effectiveUserName,
         'recipientNumber': recipient,
         'dataCode': bundle.id,
         'network': _networkCode(networkId),
@@ -1145,7 +1159,7 @@ class RemoteServicesRepository implements ServicesRepository {
         'amount': amount,
         'recipientNumber': msisdn,
         'recipientCountryCode': iso,
-        'senderNumber': senderNumber ?? _userPhone,
+        'senderNumber': senderNumber ?? _usable(_userPhone),
         'senderCountryCode': senderCountryCode,
         'currency': currency,
         if (recipientEmail != null && recipientEmail.isNotEmpty)
@@ -1154,8 +1168,8 @@ class RemoteServicesRepository implements ServicesRepository {
         // recipient picks direct data or Lida Value.
         'enableRecipientChoice': !isSelfTopup,
         'isSelfTopup': isSelfTopup,
-        if (_userId != null) 'userId': _userId,
-        if (_userName != null) 'userName': _userName,
+        if (_effectiveUserId != null) 'userId': _effectiveUserId,
+        if (_effectiveUserName != null) 'userName': _effectiveUserName,
       },
     );
     return _receipt(
@@ -1212,7 +1226,7 @@ class RemoteServicesRepository implements ServicesRepository {
         'amount': amount,
         'recipientNumber': msisdn,
         'recipientCountryCode': iso,
-        'senderNumber': senderNumber ?? _userPhone,
+        'senderNumber': senderNumber ?? _usable(_userPhone),
         'senderCountryCode': senderCountryCode,
         'currency': currency,
         if (recipientEmail != null && recipientEmail.isNotEmpty)
@@ -1536,8 +1550,8 @@ class RemoteServicesRepository implements ServicesRepository {
     final raw = await _api.postRaw(
       ApiEndpoints.gtPayPay,
       body: {
-        if (_userId != null && _userId.isNotEmpty) 'userId': _userId,
-        if (_userName != null && _userName.isNotEmpty) 'userName': _userName,
+        if (_effectiveUserId != null) 'userId': _effectiveUserId,
+        if (_effectiveUserName != null) 'userName': _effectiveUserName,
         'ServiceDetails': {
           'ServiceName': serviceName,
           'ServiceNumber': serviceNumber,
@@ -1547,7 +1561,7 @@ class RemoteServicesRepository implements ServicesRepository {
           // GTBank hashes the body, so the amount travels as an exact string.
           'Amount': amount.toStringAsFixed(2),
           'Remarks': remarks,
-          'PaidBy': _userName ?? 'Lidapay user',
+          'PaidBy': _effectiveUserName ?? 'Lidapay user',
           'PayeeName': ?payee,
         },
       },

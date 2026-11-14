@@ -150,7 +150,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: AppRoutes.login,
-        builder: (context, state) => const LoginScreen(),
+        builder: (context, state) => LoginScreen(
+          passwordResetComplete:
+              state.uri.queryParameters['passwordReset'] == '1',
+        ),
       ),
       GoRoute(
         path: AppRoutes.register,

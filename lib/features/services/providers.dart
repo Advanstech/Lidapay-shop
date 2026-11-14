@@ -14,7 +14,13 @@ final servicesRepositoryProvider = Provider<ServicesRepository>((ref) {
   final user = session?.user;
   final name = user == null
       ? null
-      : (user.fullName.isEmpty ? user.phoneNumber : user.fullName);
+      : (user.fullName.isNotEmpty
+            ? user.fullName
+            : user.phoneNumber.isNotEmpty
+            ? user.phoneNumber
+            : user.username.isNotEmpty
+            ? user.username
+            : (user.email.isNotEmpty ? user.email : null));
   return RemoteServicesRepository(
     ref.watch(apiClientProvider),
     userId: user?.id,

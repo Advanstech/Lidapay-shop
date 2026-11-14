@@ -12,11 +12,12 @@ Product and category browsing is public.
 
 ### Getting a token
 
-Login is OTP-based: `POST /api/v1/auth/login/request-otp` →
-`POST /api/v1/auth/login/verify-otp` returns `access_token`, `refresh_token` and
-the `user` object. Refresh via `POST /api/v1/auth/refresh`. Wherever a `userId`
-is required below, use `user._id` from the login response (the same value the JWT
-carries as `sub`).
+Users can sign in with a password via `POST /api/v1/users/login`, or choose
+passwordless email-code login via `POST /api/v1/auth/login/request-otp` →
+`POST /api/v1/auth/login/verify-otp`. Either flow returns `access_token`,
+`refresh_token` and the `user` object. Refresh via
+`POST /api/v1/auth/refresh`. Wherever a `userId` is required below, use
+`user._id` from the login response (the same value the JWT carries as `sub`).
 
 ---
 
@@ -237,7 +238,7 @@ POST /api/v1/shop/admin/branches
   "shopId": "<shop _id from the create-shop response>",
   "name": "East Legon Branch",
   "partnerName": "Melcom Ghana",
-  "addressLine1": "JRQQ+V32, Near Sel Filling Station, Mensah Wood Ave",
+  "addressLine1": "JRRQ+V32, Near Sel Filling Station, Mensah Wood Ave",
   "city": "Accra",
   "region": "Greater Accra",
   "country": "Ghana",
@@ -253,6 +254,28 @@ rather than the exact pickup entrance; the listing also showed "Temporarily
 closed." The create example sets the branch active at the user's direction for
 testing. Confirm operational status and refine the entrance pin before
 fulfilling real customer orders.
+
+Create the second initial location using the same parent `shopId`:
+
+```json
+{
+  "shopId": "<same generated Melcom Ghana shop _id>",
+  "name": "Shiashie Branch",
+  "partnerName": "Melcom Ghana",
+  "addressLine1": "Shiashie, Boundary Rd, Accra",
+  "addressLine2": "Opposite Gethsemane Memorial Garden",
+  "city": "Accra",
+  "region": "Greater Accra",
+  "country": "Ghana",
+  "latitude": 5.6274853,
+  "longitude": -0.1758338,
+  "active": true
+}
+```
+
+The Shiashie coordinates are a provisional geocode for Shiashie on Boundary
+Road, not a confirmed Melcom entrance. Verify the exact pickup point before
+using this branch for live customer deliveries.
 
 Manage shops with `GET /api/v1/shop/admin/shops`,
 `PUT /api/v1/shop/admin/shops/{id}`, and

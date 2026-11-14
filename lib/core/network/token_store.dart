@@ -152,6 +152,16 @@ class TokenStore {
       await _secrets.write(_refreshKey, refreshToken);
     }
     if (profile != null) await saveProfile(profile);
+    // If a biometric session exists, keep its snapshot in sync — backends
+    // that rotate refresh tokens would otherwise invalidate fingerprint
+    // sign-in after the first token refresh. Skipped when this save has no
+    // refresh material (biometric restore requires it).
+    final refresh = _refresh;
+    if (refresh != null &&
+        refresh.isNotEmpty &&
+        (await _secrets.read(_biometricSessionKey)) != null) {
+      await saveBiometricSession();
+    }
   }
 
   Future<void> saveProfile(Map<String, dynamic> profile) async {

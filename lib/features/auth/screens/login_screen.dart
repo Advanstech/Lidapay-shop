@@ -6,11 +6,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:local_auth/local_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/formatters.dart';
 import '../../../core/utils/validators.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_text_field.dart';
@@ -21,7 +23,12 @@ import '../providers.dart';
 enum _VerifyMode { otp, password }
 
 class LoginScreen extends ConsumerStatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({super.key, this.passwordResetComplete = false});
+
+  /// Set when the browser reset flow returns through
+  /// `lidapay://auth/password-reset-complete` — the password was already
+  /// changed on the web page, so we only confirm it here.
+  final bool passwordResetComplete;
 
   @override
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
@@ -47,6 +54,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   int _resendCooldown = 0;
   Timer? _cooldownTimer;
 
+  /// Null until the probe resolves — the fingerprint button stays hidden
+  /// on devices with no enrolled biometrics (emulators, feature phones).
+  bool? _biometricAvailable;
+  BiometricType? _primaryBiometric;
+
   @override
   void initState() {
     super.initState();
@@ -57,6 +69,42 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         if (mounted) setState(() {});
       });
     }
+    if (!kIsWeb) _probeBiometrics();
+    if (widget.passwordResetComplete) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Password updated. Sign in with your new password.',
+            ),
+          ),
+        );
+      });
+    }
+  }
+
+  Future<void> _probeBiometrics() async {
+    try {
+      final available = await _localAuth.getAvailableBiometrics();
+      if (!mounted) return;
+      setState(() {
+        _biometricAvailable = available.isNotEmpty;
+        _primaryBiometric = available.isEmpty ? null : available.first;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _biometricAvailable = false);
+    }
+  }
+
+  /// Face ID glyph on iOS when Face ID is the enrolled modality,
+  /// fingerprint everywhere else.
+  IconData get _biometricIcon {
+    if (defaultTargetPlatform == TargetPlatform.iOS &&
+        _primaryBiometric == BiometricType.face) {
+      return Icons.face_rounded;
+    }
+    return Icons.fingerprint_rounded;
   }
 
   void _onUsernameChanged() {
@@ -143,10 +191,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     try {
       final challenge = await ref
           .read(authSessionProvider.notifier)
-          .requestLoginOtp(
-            username: username,
-            password: _password.text.isEmpty ? null : _password.text,
-          );
+          .requestLoginOtp(username: username);
       if (!mounted) return;
       _startCooldown();
       setState(() {
@@ -156,11 +201,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     } on ApiException catch (e) {
       if (!mounted) return;
       if (silentIfPasswordRequired) {
-        // The API requires the password before it issues a code — the OTP
-        // pane is a dead end without a challenge, so land on the password
-        // pane where the user can sign in or request the code. A 400 is
-        // the expected "password is required" validation; anything else is
-        // a real failure worth surfacing.
+        // The proactive challenge for the OTP pane failed — land on the
+        // password pane where the user can still sign in or request the
+        // code explicitly; surface anything beyond a validation 400.
         setState(() {
           _verifyMode = _VerifyMode.password;
           if (e.statusCode != 400) _apiError = e.message;
@@ -264,10 +307,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       final username = _username.text.trim();
       final notifier = ref.read(authSessionProvider.notifier);
       if (notifier.pendingOtpChallenge == null) {
-        await notifier.requestLoginOtp(
-          username: username,
-          password: _password.text.isEmpty ? null : _password.text,
-        );
+        await notifier.requestLoginOtp(username: username);
       }
       await notifier.verifyLoginOtp(username: username, otpCode: _otpCode);
       await _finishSignIn();
@@ -306,7 +346,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       final username = _username.text.trim();
       final challenge = await ref
           .read(authSessionProvider.notifier)
-          .requestLoginOtp(username: username, password: _password.text);
+          .requestLoginOtp(username: username);
       if (!mounted) return;
       _startCooldown();
       _clearOtpBoxes();
@@ -324,13 +364,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
+  static const _biometricPromptKey = 'lidapay.biometric_prompt_dismissed';
+
   Future<void> _finishSignIn() async {
     if (!kIsWeb) {
       final notifier = ref.read(authSessionProvider.notifier);
       try {
         final alreadyEnabled = await notifier.hasBiometricLogin;
+        final prefs = await SharedPreferences.getInstance();
+        final dismissed = prefs.getBool(_biometricPromptKey) ?? false;
         final biometrics = await _localAuth.getAvailableBiometrics();
-        if (!alreadyEnabled && biometrics.isNotEmpty && mounted) {
+        if (!alreadyEnabled &&
+            !dismissed &&
+            biometrics.isNotEmpty &&
+            mounted) {
           final enable = await showDialog<bool>(
             context: context,
             builder: (dialogContext) => AlertDialog(
@@ -340,7 +387,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.pop(dialogContext, false),
+                  onPressed: () {
+                    // Don't nag on every sign-in — the fingerprint button
+                    // on the login screen stays available regardless.
+                    SharedPreferences.getInstance().then(
+                      (p) => p.setBool(_biometricPromptKey, true),
+                    );
+                    Navigator.pop(dialogContext, false);
+                  },
                   child: const Text('Not now'),
                 ),
                 FilledButton(
@@ -527,7 +581,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   color: scheme.onSurface,
                 ),
               ),
-              if (!kIsWeb)
+              if (_biometricAvailable == true)
                 OutlinedButton(
                   onPressed: _loading ? null : _biometricSignIn,
                   style: OutlinedButton.styleFrom(
@@ -542,8 +596,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       borderRadius: BorderRadius.circular(18),
                     ),
                   ),
-                  child: const Icon(
-                    Icons.fingerprint_rounded,
+                  child: Icon(
+                    _biometricIcon,
                     color: AppColors.primary,
                     size: 26,
                   ),
@@ -747,14 +801,43 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          _otpStatusMessage ??
-              'Enter the 6-digit verification code sent to your account.',
-          style: TextStyle(
-            color: scheme.onSurfaceVariant,
-            fontSize: 13.5,
-            fontWeight: FontWeight.w500,
-          ),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 250),
+          child: _sendingOtp
+              ? Row(
+                  key: const ValueKey('otp_sending'),
+                  children: [
+                    SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: scheme.primary,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Sending code to your account…',
+                        style: TextStyle(
+                          color: scheme.onSurfaceVariant,
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+              : Text(
+                  _otpStatusMessage ??
+                      'Enter the 6-digit verification code sent to your account.',
+                  key: const ValueKey('otp_status'),
+                  style: TextStyle(
+                    color: scheme.onSurfaceVariant,
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
         ),
         const SizedBox(height: 16),
         AutofillGroup(
@@ -789,6 +872,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       key: ValueKey('otp_box_$index'),
                       controller: _otpControllers[index],
                       focusNode: _otpFocusNodes[index],
+                      enabled: !_sendingOtp && !_loading,
                       textAlign: TextAlign.center,
                       keyboardType: TextInputType.number,
                       textInputAction: index == 5
@@ -849,17 +933,31 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: _sendingOtp
-                    ? Text(
-                        'Sending code…',
-                        style: TextStyle(
-                          color: scheme.onSurfaceVariant,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
+                    ? Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            width: 13,
+                            height: 13,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Sending code…',
+                            style: TextStyle(
+                              color: scheme.onSurfaceVariant,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
                       )
                     : _resendCooldown > 0
                     ? Text(
-                        'Resend code in 0:${_resendCooldown.toString().padLeft(2, '0')}',
+                        'Resend code in ${Formatters.countdown(_resendCooldown)}',
                         style: TextStyle(
                           color: scheme.onSurfaceVariant,
                           fontSize: 13,
@@ -1064,10 +1162,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           onPressed: _sendingOtp
                               ? null
                               : _sendOtpFromPasswordStep,
-                          icon: const Icon(
-                            Icons.mark_email_read_outlined,
-                            size: 17,
-                          ),
+                          icon: _sendingOtp
+                              ? SizedBox(
+                                  width: 15,
+                                  height: 15,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: scheme.primary,
+                                  ),
+                                )
+                              : const Icon(
+                                  Icons.mark_email_read_outlined,
+                                  size: 17,
+                                ),
                           label: Text(
                             _sendingOtp
                                 ? 'Sending 6-digit code…'

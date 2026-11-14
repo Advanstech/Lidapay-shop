@@ -78,7 +78,7 @@ class _CartScreenState extends ConsumerState<CartScreen>
       orderSummary:
           'Shop order · ${cartData.itemCount} '
           '${cartData.itemCount == 1 ? 'item' : 'items'}',
-      registeredNumber: user?.phoneNumber ?? '',
+      registeredNumber: user?.contactPhone ?? '',
       showMobileMoney: false,
     );
     if (!mounted || choice == null) return;

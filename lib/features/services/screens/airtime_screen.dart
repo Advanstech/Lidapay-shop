@@ -888,7 +888,7 @@ class _AirtimeScreenState extends ConsumerState<AirtimeScreen>
       context: context,
       amountLabel: _priceLabel(_amountValue),
       orderSummary: 'Airtime top-up · $recipientDigits',
-      registeredNumber: user?.phoneNumber ?? '',
+      registeredNumber: user?.contactPhone ?? '',
     );
     if (!mounted || choice == null) {
       if (mounted) setState(() => _submitting = false);

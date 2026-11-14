@@ -17,7 +17,7 @@ team knows what to implement next and what a successful API response means.
 
 ```text
 App launch
-  ├─ no valid session → Login → Request OTP → Verify OTP → save session
+  ├─ no valid session → Login with password OR email code → save session
   └─ valid session ────────────────────────────────────────┐
                                                            ↓
               Register/refresh FCM token → Load home data
@@ -42,7 +42,7 @@ App launch
 | Milestone | Start with | Expected result / exit criteria |
 |---|---|---|
 | 1. App foundation | API client, environment config, secure session store, navigation | Public API works; errors are typed; no secrets/tokens are logged |
-| 2. Auth | OTP login, refresh, logout | User reaches authenticated home; expired access token refreshes once |
+| 2. Auth | Password or email-code login, refresh, logout | User reaches authenticated home; expired access token refreshes once |
 | 3. Account readiness | FCM permission/token registration, profile and wallet balance | Current user token is registered; home can recover state after relaunch |
 | 4. Existing core services | Ghana and Reloadly airtime/data; Lida Value | Direct success, pending recipient decision, and failure each show distinct UX |
 | 5. Payments | Advansis Pay and GTPay initiation, checkout return, status verification | Provider callbacks/redirects are hints; backend verification settles the receipt |
@@ -83,33 +83,57 @@ Authorization: Bearer <access_token>
 Content-Type: application/json
 ```
 
-Login is OTP-based:
-
-1. `POST /api/v1/auth/login/request-otp`
-2. `POST /api/v1/auth/login/verify-otp`
-3. Refresh with `POST /api/v1/auth/refresh` and `{ "refreshToken": "..." }`
+Users can choose password login or passwordless email-code login:
+- Password: `POST /api/v1/users/login` with username and password.
+- Email code: `POST /api/v1/auth/login/request-otp`, then
+  `POST /api/v1/auth/login/verify-otp`.
+- Refresh with `POST /api/v1/auth/refresh` and `{ "refreshToken": "..." }`.
 
 Keep the returned `user._id` as the authenticated user ID. Do not accept a
 client-supplied `userId` as authorization; backend authentication owns identity.
 Refresh once on an expired access token, then require re-authentication if the
 refresh request fails.
 
-### Auth flow — request, verify, restore, and logout
+### Auth flow — password or email code, restore, and logout
 
-**Start:** login screen collects the user's existing username/phone/email and
-password. The first call does not yet create an authenticated app session.
+Offer two sign-in choices. Keep the challenge token only in memory and do not
+treat it as an access token.
+
+**Password option:** submit the user's username, email, or phone and password:
+
+```http
+POST /api/v1/users/login
+Content-Type: application/json
+
+{
+  "username": "0244000000",
+  "password": "<user-entered password>",
+  "deviceToken": "<FCM token, if available>",
+  "devicePlatform": "ANDROID",
+  "deviceId": "<stable app-scoped device ID>",
+  "appVersion": "<app version>",
+  "locale": "en-GH"
+}
+```
+
+This returns `access_token`, `refresh_token`, and `user` immediately. Save both
+tokens in secure storage and continue to the authenticated home.
+
+**Email-code option:** request a six-digit code using the existing username,
+email, or phone. No password is required:
 
 ```http
 POST /api/v1/auth/login/request-otp
 Content-Type: application/json
 
-{
-  "username": "0244000000",
-  "password": "<user-entered password>"
-}
+{ "username": "0244000000" }
 ```
 
-On success, expect a challenge response such as:
+The `username` field accepts the account's mobile number or email address too;
+for example, `{ "username": "user@example.com" }`. The verification code is
+sent to the email address saved on that account.
+
+On success, expect a challenge response:
 
 ```json
 {
@@ -119,11 +143,48 @@ On success, expect a challenge response such as:
 }
 ```
 
-Keep `challengeToken` temporarily in memory for the OTP screen. Do not treat it
-as an access token or persist it as a logged-in session. Show the OTP entry
-screen and expiry/resend feedback. Invalid credentials, throttling, unavailable
-email, or expired challenge must leave the user unauthenticated with a clear
-retry or support path.
+**Backend smoke test (run with an authorized test account):** send the
+account's mobile number or email as a JSON string. Preserve leading zeroes in
+mobile numbers:
+
+```sh
+curl --include --request POST \
+  'https://api.advansistechnologies.com/api/v1/auth/login/request-otp' \
+  --header 'Content-Type: application/json' \
+  --data '{"username":"<TEST_MOBILE_NUMBER_OR_EMAIL>"}'
+```
+
+The request is public; do not send an access token or password. A successful
+request returns HTTP `200` with a `challengeToken` and `expiresAt`, and sends
+the six-digit code to the email address saved on that account. The same request
+works with either identifier, for example `{"username":"0244000000"}` or
+`{"username":"user@example.com"}`. Use a test account whose inbox you can
+check, and do not repeatedly request codes; the endpoint is rate-limited.
+
+After retrieving the code from that inbox, verify it using the exact challenge
+token from the response:
+
+```sh
+curl --include --request POST \
+  'https://api.advansistechnologies.com/api/v1/auth/login/verify-otp' \
+  --header 'Content-Type: application/json' \
+  --data '{"challengeToken":"<CHALLENGE_TOKEN>","otpCode":"<SIX_DIGIT_CODE>"}'
+```
+
+Successful verification returns HTTP `200` with `access_token`,
+`refresh_token`, and `user`. Keep these values private; redact them before
+sharing logs or screenshots. An unknown identifier returns `401` with
+`"Invalid login identifier"`. A `500` from either call is a backend failure,
+not an OTP/challenge-token rejection; the backend team should correlate the
+UTC request time with the server exception logs. A `500` on the request step
+means no successful challenge response was issued to the app.
+
+Show the six-digit code entry screen and expiry feedback. The code is emailed to
+the address on the account and expires after the configured interval (10
+minutes by default). Invalid identifier, throttling, unavailable email, or
+expired challenge must leave the user unauthenticated with a clear retry or
+support path. To request a new code, start a new request and replace the old
+challenge token.
 
 **Verify:** submit the exact challenge token and the OTP received by the user:
 
@@ -172,10 +233,59 @@ wallet/cart/decision data, and pending private navigation state. When another
 user signs in on the same device, register the device's current FCM token under
 that user.
 
-The OTP is sent to the email on the user's account. The request endpoint is
-rate-limited; don't implement automatic rapid retries. The user-facing login
-experience should explain that an email code is required even when they log in
-with a phone number or username.
+For the email-code login option, the code is sent to the email on the user's
+account. The request endpoint is rate-limited; don't implement automatic rapid
+retries.
+
+### Password reset
+
+The app starts a reset request with
+`POST /api/v1/users/reset-password`, sending either `{ "email": "..." }` or
+`{ "phoneNumber": "..." }`. The backend sends the reset link by email or SMS.
+For phone resets, the backend sends an SMS to the account's stored phone
+number through One4All. The API server must have `ONE4ALL_BASEURL`,
+`ONE4ALL_APIKEY`, `ONE4ALL_APISECRET`, and the approved
+`ONE4ALL_SMS_SENDER_ID` configured. These are backend settings/secrets and
+must never be added to the app. A provider failure returns HTTP `502`, while
+missing One4All SMS configuration returns HTTP `503`; check the backend logs.
+The link opens a responsive browser form at
+`https://api.advansistechnologies.com/reset-password`; the user enters and
+confirms the new password there. The form submits the token and new password to
+the backend and displays a success or expired-link message. The reset token is
+carried in the URL fragment so it is not sent in the initial page request.
+After a successful reset, the web page shows an **Open LidaPay** action using
+`lidapay://auth/password-reset-complete`. The app team must register and handle
+this route on iOS and Android. It should open the login screen and show a
+password-reset success message; the deep link contains no password or reset
+token. The page also instructs the user to open the app manually if the link
+does not launch it. Do not route this callback through the payment-specific
+`lidapay://redirect-url` handler.
+
+### Email verification
+
+Registration sends an email verification link automatically. In the profile,
+use `emailVerified` from `GET /api/v1/users/profile` to show whether the email is
+verified. The link calls the public endpoint below; no access token is required
+when the user opens it:
+
+```http
+GET /api/v1/users/verify-email/<one-time-token>
+```
+
+The link is single-use and expires after 24 hours. If it expires or the message
+was not received, an authenticated user can tap **Verify** in the profile to
+request a new message:
+
+```http
+POST /api/v1/users/resend-verification-email
+Authorization: Bearer <access_token>
+```
+
+No email address is sent in the request body; the backend sends the message to
+the signed-in account's email. The API constructs links using `API_URL` (defaults
+to the production API URL), so set it to the reachable API origin in non-
+production environments. Phone verification is separate and is not part of
+this email flow.
 
 ## 2. Country, provider, and service selection
 

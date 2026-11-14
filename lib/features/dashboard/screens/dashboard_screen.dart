@@ -116,7 +116,7 @@ class DashboardScreen extends ConsumerWidget {
                 ),
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
                 child:
-                    wallet.whenData((w) => WalletCard(wallet: w)).value ??
+                    wallet.whenData((w) => WalletCard(wallet: w)).valueOrNull ??
                     const SizedBox.shrink(),
               ),
             ),
@@ -186,7 +186,7 @@ class DashboardScreen extends ConsumerWidget {
                                 ],
                               ),
                       )
-                      .value ??
+                      .valueOrNull ??
                   const SizedBox.shrink(),
             ),
             const SliverToBoxAdapter(child: SizedBox(height: 30)),
@@ -216,7 +216,7 @@ class DashboardScreen extends ConsumerWidget {
                                 ),
                               ),
                       )
-                      .value ??
+                      .valueOrNull ??
                   const SizedBox.shrink(),
             ),
             const SliverToBoxAdapter(child: SizedBox(height: 120)),

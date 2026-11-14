@@ -49,18 +49,25 @@ class PendingTopupScreen extends ConsumerStatefulWidget {
 
 class _PendingTopupScreenState extends ConsumerState<PendingTopupScreen> {
   Timer? _ticker;
-  Duration _remaining = Duration.zero;
 
   /// The window length as observed when this screen mounted. The API only
   /// publishes `expiresAt`, so the arc is drawn against the span actually
   /// watched here rather than a guessed total.
   Duration _window = Duration.zero;
 
+  /// Countdown band driving page-level chrome (accent, settling copy).
+  /// The page only rebuilds when the band flips — the live clock itself
+  /// ticks inside [_CountdownHero] and [_SettleNote], which rebuild only
+  /// their own small subtrees.
+  int _band = 0;
+
+  static const _bandWarn = Duration(seconds: 60);
+  static const _bandClose = Duration(seconds: 20);
+
   @override
   void initState() {
     super.initState();
-    _tick();
-    _window = _remaining;
+    _syncWindow();
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
   }
 
@@ -70,28 +77,48 @@ class _PendingTopupScreenState extends ConsumerState<PendingTopupScreen> {
     super.dispose();
   }
 
-  void _tick() {
-    if (!mounted) return;
-    setState(() {
-      _remaining =
-          widget.pending.expiresAt?.difference(DateTime.now()) ?? Duration.zero;
-      if (_remaining.isNegative) _remaining = Duration.zero;
-    });
+  void _syncWindow() {
+    final remaining = _remainingNow;
+    _window = remaining;
+    _band = _bandFor(remaining, hasWindow: _hasWindow);
+  }
+
+  Duration get _remainingNow {
+    final exp = widget.pending.expiresAt;
+    if (exp == null) return Duration.zero;
+    final r = exp.difference(DateTime.now());
+    return r.isNegative ? Duration.zero : r;
   }
 
   bool get _hasWindow => widget.pending.expiresAt != null;
 
-  /// 1.0 = the whole window is still left, 0.0 = it just closed.
-  double get _fraction {
-    if (_window <= Duration.zero) return 0;
-    return (_remaining.inMilliseconds / _window.inMilliseconds).clamp(0.0, 1.0);
+  /// 0 = plenty of time, 1 = under a minute, 2 = under 20s, 3 = window
+  /// closed. Band 2 and 3 share the error accent; 3 additionally flips the
+  /// page into its "settling" copy.
+  static int _bandFor(Duration remaining, {required bool hasWindow}) {
+    if (!hasWindow || remaining > _bandWarn) return 0;
+    if (remaining > _bandClose) return 1;
+    return remaining == Duration.zero ? 3 : 2;
   }
 
-  String get _clock {
-    final mm = _remaining.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final ss = _remaining.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return '$mm:$ss';
+  void _tick() {
+    if (!mounted) return;
+    // Terminal status swaps in the result view — the countdown is moot, so
+    // stop ticking entirely instead of burning a timer for the rest of
+    // the session.
+    final status = ref
+        .read(topupStatusTrackerProvider(widget.pending.topupOrderId))
+        .valueOrNull;
+    if (status?.isTerminal == true) {
+      _ticker?.cancel();
+      _ticker = null;
+      return;
+    }
+    final band = _bandFor(_remainingNow, hasWindow: _hasWindow);
+    if (band != _band) setState(() => _band = band);
   }
+
+  bool get _settling => _band == 3;
 
   Future<void> _copyReference() async {
     await Clipboard.setData(ClipboardData(text: widget.pending.topupOrderId));
@@ -118,11 +145,11 @@ class _PendingTopupScreenState extends ConsumerState<PendingTopupScreen> {
               : status.isDeliveredToLidaValue
               ? AppColors.violet
               : AppColors.error
-        : _remaining <= const Duration(seconds: 20)
-        ? AppColors.error
-        : _remaining <= const Duration(seconds: 60)
+        : _band == 0
+        ? AppColors.primary
+        : _band == 1
         ? AppColors.warning
-        : AppColors.primary;
+        : AppColors.error;
 
     return Scaffold(
       backgroundColor: isDark
@@ -157,7 +184,7 @@ class _PendingTopupScreenState extends ConsumerState<PendingTopupScreen> {
         ? Colors.white.withValues(alpha: 0.08)
         : const Color(0xFFECEAF2);
     final muted = scheme.onSurfaceVariant;
-    final settling = _hasWindow && _remaining == Duration.zero;
+    final settling = _settling;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 6, 20, 30),
@@ -169,15 +196,12 @@ class _PendingTopupScreenState extends ConsumerState<PendingTopupScreen> {
         ),
         const SizedBox(height: 10),
         _CountdownHero(
-          fraction: _fraction,
-          clock: _clock,
+          expiresAt: widget.pending.expiresAt,
+          window: _window,
           accent: accent,
           track: isDark
               ? Colors.white.withValues(alpha: 0.10)
               : AppColors.navy.withValues(alpha: 0.08),
-          showCountdown: _hasWindow && !settling,
-          settled: settling,
-          hasWindow: _hasWindow,
           surface: surface,
         ),
         const SizedBox(height: 20),
@@ -266,12 +290,7 @@ class _PendingTopupScreenState extends ConsumerState<PendingTopupScreen> {
           onCopyReference: _copyReference,
         ),
         const SizedBox(height: 14),
-        _SettleNote(
-          accent: accent,
-          remaining: _remaining,
-          hasWindow: _hasWindow,
-          clock: _clock,
-        ),
+        _SettleNote(accent: accent, expiresAt: widget.pending.expiresAt),
         const SizedBox(height: 22),
         _LeaveButton(
           onPressed: widget.onDone,
@@ -395,30 +414,84 @@ class _GlassIconButton extends StatelessWidget {
 }
 
 /// The hero: pulse rings reaching outward, a depleting arc, and the clock.
-class _CountdownHero extends StatelessWidget {
+/// Owns its own 1s ticker so the countdown only rebuilds this subtree —
+/// the page around it rebuilds solely on countdown-band changes.
+class _CountdownHero extends StatefulWidget {
   const _CountdownHero({
-    required this.fraction,
-    required this.clock,
+    required this.expiresAt,
+    required this.window,
     required this.accent,
     required this.track,
-    required this.showCountdown,
-    required this.settled,
-    required this.hasWindow,
     required this.surface,
   });
 
-  final double fraction;
-  final String clock;
+  final DateTime? expiresAt;
+
+  /// Window length observed at screen mount — the arc depletes against it.
+  final Duration window;
   final Color accent;
   final Color track;
-  final bool showCountdown;
-  final bool settled;
-  final bool hasWindow;
   final Color surface;
+
+  @override
+  State<_CountdownHero> createState() => _CountdownHeroState();
+}
+
+class _CountdownHeroState extends State<_CountdownHero> {
+  Timer? _timer;
+  Duration _remaining = Duration.zero;
+  late Duration _window = widget.window;
+
+  @override
+  void initState() {
+    super.initState();
+    _tick();
+    if (widget.window <= Duration.zero) _window = _remaining;
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _tick() {
+    final exp = widget.expiresAt;
+    if (!mounted || exp == null) return;
+    final r = exp.difference(DateTime.now());
+    setState(() {
+      _remaining = r.isNegative ? Duration.zero : r;
+    });
+  }
+
+  bool get _hasWindow => widget.expiresAt != null;
+
+  bool get _settled => _hasWindow && _remaining == Duration.zero;
+
+  bool get _showCountdown => _hasWindow && !_settled;
+
+  /// 1.0 = the whole window is still left, 0.0 = it just closed.
+  double get _fraction {
+    if (_window <= Duration.zero) return 0;
+    return (_remaining.inMilliseconds / _window.inMilliseconds).clamp(0.0, 1.0);
+  }
+
+  String get _clock {
+    final mm = _remaining.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final ss = _remaining.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$mm:$ss';
+  }
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final accent = widget.accent;
+    final track = widget.track;
+    final surface = widget.surface;
+    final showCountdown = _showCountdown;
+    final settled = _settled;
+    final hasWindow = _hasWindow;
     return SizedBox(
       height: 224,
       child: Stack(
@@ -427,7 +500,7 @@ class _CountdownHero extends StatelessWidget {
           _PulseRings(color: accent, size: 224),
           if (showCountdown)
             TweenAnimationBuilder<double>(
-              tween: Tween<double>(end: fraction),
+              tween: Tween<double>(end: _fraction),
               duration: const Duration(milliseconds: 950),
               curve: Curves.linear,
               builder: (context, value, _) => CustomPaint(
@@ -455,7 +528,7 @@ class _CountdownHero extends StatelessWidget {
             children: [
               if (showCountdown)
                 Text(
-                  clock,
+                  _clock,
                   style: TextStyle(
                     fontSize: 46,
                     height: 1.05,
@@ -942,22 +1015,52 @@ class _SummaryCard extends StatelessWidget {
   }
 }
 
-class _SettleNote extends StatelessWidget {
-  const _SettleNote({
-    required this.accent,
-    required this.remaining,
-    required this.hasWindow,
-    required this.clock,
-  });
+/// Self-ticking so the "no answer by HH:MM:SS" line updates without
+/// rebuilding the rest of the page.
+class _SettleNote extends StatefulWidget {
+  const _SettleNote({required this.accent, required this.expiresAt});
 
   final Color accent;
-  final Duration remaining;
-  final bool hasWindow;
-  final String clock;
+  final DateTime? expiresAt;
+
+  @override
+  State<_SettleNote> createState() => _SettleNoteState();
+}
+
+class _SettleNoteState extends State<_SettleNote> {
+  Timer? _timer;
+  Duration _remaining = Duration.zero;
+
+  @override
+  void initState() {
+    super.initState();
+    _tick();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _tick() {
+    final exp = widget.expiresAt;
+    if (!mounted || exp == null) return;
+    final r = exp.difference(DateTime.now());
+    setState(() {
+      _remaining = r.isNegative ? Duration.zero : r;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    final closed = hasWindow && remaining == Duration.zero;
+    final accent = widget.accent;
+    final hasWindow = widget.expiresAt != null;
+    final closed = hasWindow && _remaining == Duration.zero;
+    final mm = _remaining.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final ss = _remaining.inSeconds.remainder(60).toString().padLeft(2, '0');
+    final clock = '$mm:$ss';
     final text = !hasWindow
         ? 'No response window was published — checking the recipient\'s '
               'choice directly.'

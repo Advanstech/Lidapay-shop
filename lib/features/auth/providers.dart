@@ -68,6 +68,12 @@ class AuthNotifier extends StateNotifier<AuthSession?> {
   StreamSubscription<void>? _clearedSub;
   OtpChallengeResponse? _pendingOtpChallenge;
   String? _pendingOtpUsername;
+  DateTime? _emailVerificationSentAt;
+
+  /// The resend endpoint is rate-limited; block repeat taps inside this
+  /// window so they never reach the API (the backend enforces its own
+  /// limit across app restarts).
+  static const _emailVerificationCooldown = Duration(seconds: 60);
 
   OtpChallengeResponse? get pendingOtpChallenge => _pendingOtpChallenge;
 
@@ -82,13 +88,14 @@ class AuthNotifier extends StateNotifier<AuthSession?> {
     }
   }
 
-  /// POST /api/v1/auth/login/request-otp — stores challenge in memory only.
+  /// POST /api/v1/auth/login/request-otp — public call; the contract sends
+  /// `{username}` only, never a password or token. Stores the returned
+  /// challenge in memory only.
   Future<OtpChallengeResponse> requestLoginOtp({
     required String username,
-    String? password,
   }) async {
     final challenge = await _repository.requestLoginOtp(
-      OtpChallengeRequest(username: username, password: password),
+      OtpChallengeRequest(username: username),
     );
     _pendingOtpChallenge = challenge;
     _pendingOtpUsername = username;
@@ -125,7 +132,14 @@ class AuthNotifier extends StateNotifier<AuthSession?> {
     );
     _pendingOtpChallenge = null;
     _pendingOtpUsername = null;
-    unawaited(refreshProfile());
+    // The verify payload may omit the user object — fill the profile before
+    // navigation so downstream providers (wallet, transactions) see a real
+    // user id instead of racing the fire-and-forget refresh.
+    try {
+      await refreshProfile();
+    } catch (_) {
+      // Best-effort: a failed fetch retries once in the background.
+    }
     if (onAuthenticated != null) {
       unawaited(onAuthenticated!());
     }
@@ -134,8 +148,8 @@ class AuthNotifier extends StateNotifier<AuthSession?> {
   Future<void> verifyOtp(String username, String code) =>
       verifyLoginOtp(username: username, otpCode: code);
 
-  Future<OtpChallengeResponse> resendOtp(String username, {String? password}) =>
-      requestLoginOtp(username: username, password: password);
+  Future<OtpChallengeResponse> resendOtp(String username) =>
+      requestLoginOtp(username: username);
 
   /// Restores a persisted session at cold start.
   Future<void> restore() async {
@@ -171,8 +185,11 @@ class AuthNotifier extends StateNotifier<AuthSession?> {
 
   /// GET /api/v1/users/profile — refreshes display fields (names,
   /// verification, KYC) without touching the tokens. Best-effort: a failed
-  /// fetch keeps the cached profile.
-  Future<void> refreshProfile() async {
+  /// fetch keeps the cached profile. Transient failures (the backend throws
+  /// occasional 5xx) get one delayed retry; auth failures do not.
+  Future<void> refreshProfile() => _refreshProfile(attempt: 0);
+
+  Future<void> _refreshProfile({required int attempt}) async {
     final session = state;
     if (session == null) return;
     try {
@@ -180,7 +197,20 @@ class AuthNotifier extends StateNotifier<AuthSession?> {
       if (mounted && state != null) {
         state = AuthSession(tokens: session.tokens, user: user);
       }
-    } on ApiException {
+    } on ApiException catch (e) {
+      if (attempt == 0 &&
+          e.statusCode != 401 &&
+          e.statusCode != 403 &&
+          mounted) {
+        unawaited(
+          Future<void>.delayed(
+            const Duration(seconds: 2),
+            () => _refreshProfile(attempt: 1),
+          ),
+        );
+      }
+      // Cached profile stays.
+    } catch (_) {
       // Cached profile stays.
     }
   }
@@ -204,8 +234,21 @@ class AuthNotifier extends StateNotifier<AuthSession?> {
     return user;
   }
 
-  Future<void> resendEmailVerification() =>
-      _repository.resendEmailVerification();
+  Future<void> resendEmailVerification() async {
+    final last = _emailVerificationSentAt;
+    if (last != null) {
+      final wait =
+          _emailVerificationCooldown - DateTime.now().difference(last);
+      if (wait > Duration.zero) {
+        throw ApiException(
+          'Verification email was just sent. Please wait ${wait.inSeconds}s '
+          'before requesting another.',
+        );
+      }
+    }
+    await _repository.resendEmailVerification();
+    _emailVerificationSentAt = DateTime.now();
+  }
 
   Future<void> resendPhoneVerification() =>
       _repository.resendPhoneVerification();

@@ -107,18 +107,14 @@ class LoginRequest extends Equatable {
 /// Password is included when requesting an email OTP challenge after password
 /// validation, or omitted when requesting a direct account challenge.
 class OtpChallengeRequest extends Equatable {
-  const OtpChallengeRequest({required this.username, this.password});
+  const OtpChallengeRequest({required this.username});
 
   final String username;
-  final String? password;
 
-  Map<String, dynamic> toJson() => {
-    'username': username,
-    if (password != null && password!.isNotEmpty) 'password': password,
-  };
+  Map<String, dynamic> toJson() => {'username': username};
 
   @override
-  List<Object?> get props => [username, password];
+  List<Object?> get props => [username];
 }
 
 /// Challenge returned by POST /api/v1/auth/login/request-otp.
@@ -270,6 +266,12 @@ class UserProfile extends Equatable {
 
   String get fullName => '$firstName $lastName'.trim();
 
+  /// Best number to prefill MoMo wallet fields with. OTP sessions can
+  /// carry the account phone in `username` when `phoneNumber` is missing —
+  /// callers still validate since `username` may hold an email instead.
+  String get contactPhone =>
+      phoneNumber.isNotEmpty ? phoneNumber : username;
+
   /// Resolves the best profile image URL for this user:
   /// 1. Explicit `avatar` or `gravatar` URL from the backend profile payload
   ///    (`data:` URIs are skipped — Image.network can't load them, and the
@@ -305,19 +307,26 @@ class UserProfile extends Equatable {
     return parts.join(', ');
   }
 
+  /// Loosely-typed backend payloads occasionally serialize JS
+  /// `undefined`/`null` as literal strings — treat them as missing.
+  static String _sane(Object? raw) {
+    final s = (raw ?? '').toString().trim();
+    return (s == 'undefined' || s == 'null') ? '' : s;
+  }
+
   factory UserProfile.fromJson(Map<String, dynamic> json) {
     final addr = json['address'] is Map
         ? Map<String, dynamic>.from(json['address'] as Map)
         : const <String, dynamic>{};
     return UserProfile(
-      id: (json['_id'] ?? json['id'] ?? '').toString(),
+      id: _sane(json['_id'] ?? json['id'] ?? json['userId']),
       firstName: (json['firstName'] ?? '').toString(),
       lastName: (json['lastName'] ?? '').toString(),
       email: (json['email'] ?? '').toString(),
-      phoneNumber:
-          (json['phoneNumber'] ?? json['phone'] ?? json['username'] ?? '')
-              .toString(),
-      username: (json['username'] ?? '').toString(),
+      phoneNumber: _sane(
+        json['phoneNumber'] ?? json['phone'] ?? json['username'],
+      ),
+      username: _sane(json['username']),
       country: (json['country'] ?? addr['country'] ?? '').toString(),
       avatar:
           (json['avatar'] ??

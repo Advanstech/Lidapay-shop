@@ -114,6 +114,30 @@ void main() {
       expect(store.profileJson?['id'], 'user_1');
     });
 
+    test('token refresh keeps the biometric snapshot in sync', () async {
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+      final store = TokenStore(prefs, secrets: MemorySecretStore());
+
+      await store.saveSession(
+        accessToken: 'access_1',
+        refreshToken: 'refresh_1',
+      );
+      await store.saveBiometricSession();
+
+      // Server rotates tokens on refresh — the stored biometric snapshot
+      // must track the new pair or fingerprint sign-in dies on first use.
+      await store.saveSession(
+        accessToken: 'access_2',
+        refreshToken: 'refresh_2',
+      );
+      await store.clear();
+
+      expect(await store.restoreBiometricSession(), isTrue);
+      expect(store.accessToken, 'access_2');
+      expect(store.refreshToken, 'refresh_2');
+    });
+
     test('rejected session can remove the biometric credential', () async {
       SharedPreferences.setMockInitialValues({});
       final prefs = await SharedPreferences.getInstance();

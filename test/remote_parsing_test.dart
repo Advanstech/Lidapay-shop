@@ -11,6 +11,7 @@ import 'package:lidapay_app/features/auth/data/remote_auth_repository.dart';
 import 'package:lidapay_app/features/dashboard/data/remote_dashboard_repository.dart';
 import 'package:lidapay_app/features/notifications/data/notification_models.dart';
 import 'package:lidapay_app/features/services/data/remote_services_repository.dart';
+import 'package:lidapay_app/features/services/data/service_models.dart';
 import 'package:lidapay_app/features/shop/data/remote_shop_repository.dart';
 import 'package:lidapay_app/features/shop/data/shop_models.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -1468,7 +1469,7 @@ void main() {
       final repo = RemoteAuthRepository(api, api.tokenStore);
 
       final challenge = await repo.requestLoginOtp(
-        const OtpChallengeRequest(username: '0244000000', password: 'secret'),
+        const OtpChallengeRequest(username: '0244000000'),
       );
       expect(challenge.challengeToken, 'challenge-jwt-123');
       expect(api.tokenStore.hasSession, isFalse);
@@ -1687,5 +1688,126 @@ void main() {
           .detectAirtimeOperator(phone: '0000', countryIsoCode: 'NG'),
       throwsA(isA<ApiException>()),
     );
+  });
+
+  group('OTP session identity hardening', () {
+    // The live verify-otp `user` object arrived with literal 'undefined'
+    // strings for identity fields; those poisoned every downstream call
+    // that requires a real user id (internet/buydata 500s on them).
+    test('profile parsing treats literal undefined/null ids as missing', () {
+      expect(
+        UserProfile.fromJson({'id': 'undefined'}).id,
+        '',
+      );
+      expect(
+        UserProfile.fromJson({'_id': 'null'}).id,
+        '',
+      );
+      expect(
+        UserProfile.fromJson({'userId': '694abae'}).id,
+        '694abae',
+      );
+    });
+
+    test(
+      'otp verify with undefined user id recovers it from the JWT sub',
+      () async {
+        // {"alg":"none"}.{"sub":"694abae5d474016f3985cdaf"}.sig — the token's
+        // sub is the same user id the backend uses as user._id.
+        final payload = base64UrlEncode(
+          utf8.encode(jsonEncode({'sub': '694abae5d474016f3985cdaf'})),
+        ).replaceAll('=', '');
+        final token = 'e30.$payload.sig';
+        final (api, _) = await _client(
+          (_) => {
+            'access_token': token,
+            'refresh_token': 'refresh-1',
+            'user': {'id': 'undefined', 'userName': 'undefined'},
+          },
+        );
+        SharedPreferences.setMockInitialValues({});
+        final prefs = await SharedPreferences.getInstance();
+        final repo = RemoteAuthRepository(api, TokenStore(prefs));
+
+        final session = await repo.verifyLoginOtp(
+          const OtpVerifyRequest(
+            challengeToken: 'challenge-1',
+            otpCode: '123456',
+            username: '0593998216',
+          ),
+        );
+
+        expect(session.user.id, '694abae5d474016f3985cdaf');
+      },
+    );
+
+    test(
+      'ghana buydata never sends undefined identity — real ids pass through',
+      () async {
+        final (api, adapter) = await _client(
+          (_) => {'success': true, 'transactionId': 'DAT-1'},
+        );
+        const bundle = DataBundle(
+          id: 'BDLHRBOOST2',
+          name: '1GB',
+          price: 1,
+          dataAmount: '1GB',
+        );
+
+        await RemoteServicesRepository(
+          api,
+          userId: 'undefined',
+          userName: '',
+          userPhone: 'undefined',
+        ).buyDataBundle(
+          recipientNumber: '0208234608',
+          networkId: '6',
+          bundle: bundle,
+          saveToLidaValue: false,
+        );
+
+        final bad = adapter.requests.last.data as Map;
+        expect(bad.containsKey('id'), isFalse);
+        expect(bad.containsKey('userId'), isFalse);
+        expect(bad.containsKey('userName'), isFalse);
+
+        await RemoteServicesRepository(
+          api,
+          userId: '694abae5d474016f3985cdaf',
+          userName: '0244588584',
+        ).buyDataBundle(
+          recipientNumber: '0244588584',
+          networkId: '4',
+          bundle: bundle,
+          saveToLidaValue: false,
+          isSelfTopup: true,
+        );
+
+        final good = adapter.requests.last.data as Map;
+        expect(good['id'], '694abae5d474016f3985cdaf');
+        expect(good['userId'], '694abae5d474016f3985cdaf');
+        expect(good['userName'], '0244588584');
+      },
+    );
+
+    test('userName falls back to the account phone when names are empty', () async {
+      final (api, adapter) = await _client(
+        (_) => {'success': true, 'transactionId': 'AIR-1'},
+      );
+
+      await RemoteServicesRepository(
+        api,
+        userName: '',
+        userPhone: '0593998216',
+      ).buyLocalAirtime(
+        recipientNumber: '0241234567',
+        amount: 5,
+        networkId: '4',
+        saveToLidaValue: false,
+      );
+
+      final body = adapter.requests.last.data as Map;
+      expect(body['userName'], '0593998216');
+    });
   });
 }

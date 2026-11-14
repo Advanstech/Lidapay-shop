@@ -14,18 +14,12 @@ class RemoteDashboardRepository implements DashboardRepository {
   final ApiClient _api;
   final String? _userId;
 
-  void _requireUserId() {
-    if (_userId == null || _userId.isEmpty) {
-      throw const ApiException(
-        'Session expired. Please sign in again.',
-        statusCode: 401,
-      );
-    }
-  }
+  bool get _hasUserId => _userId != null && _userId.isNotEmpty;
 
   @override
   Future<WalletSummary> getWalletSummary() async {
-    _requireUserId();
+    // The wallet, Lida Value, and points endpoints are all JWT-scoped — no
+    // user id is required, so the card renders before the profile lands.
     // Each section fails independently: a 500 on the wallet document must
     // not blank the whole dashboard.
     final results = await Future.wait<Object?>([
@@ -126,7 +120,10 @@ class RemoteDashboardRepository implements DashboardRepository {
 
   @override
   Future<List<Transaction>> getRecentTransactions({int limit = 5}) async {
-    _requireUserId();
+    // No usable user id yet (e.g. OTP session while /users/profile is down):
+    // return empty — the provider rebuilds with the id once auth state lands.
+    // Throwing here bubbles into the dashboard build and blanks the screen.
+    if (!_hasUserId) return const [];
     // Merged feed: ledger + Lida Value history + shop orders + points, so
     // Recent activity reflects everything, not just one endpoint.
     final feed = await ActivityFeed(

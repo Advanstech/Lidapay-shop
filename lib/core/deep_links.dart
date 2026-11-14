@@ -76,6 +76,9 @@ class PaymentDeepLinkHandler {
 
   /// `lidapay://reset-password?token=…` / `lidapay://verify-password-change?token=…`
   /// (host-style) or the path-style `lidapay:///reset-password?token=…`.
+  /// `lidapay://auth/password-reset-complete` is the post-reset "Open LidaPay"
+  /// action from the backend's browser reset form — it carries no token and
+  /// only confirms the password was already changed on the web page.
   /// The backend may also emit plain https APP_URL links — those arrive
   /// through go_router directly, not this stream.
   static bool _isPasswordLink(Uri uri) {
@@ -84,11 +87,21 @@ class PaymentDeepLinkHandler {
     final path = uri.path;
     return host == 'reset-password' ||
         host == 'verify-password-change' ||
+        (host == 'auth' && path.contains('password-reset-complete')) ||
         path.contains('reset-password') ||
         path.contains('verify-password-change');
   }
 
   void _routePasswordLink(Uri uri) {
+    if (uri.path.contains('password-reset-complete')) {
+      _router.go(
+        Uri(
+          path: AppRoutes.login,
+          queryParameters: const {'passwordReset': '1'},
+        ).toString(),
+      );
+      return;
+    }
     final isReset =
         uri.host == 'reset-password' || uri.path.contains('reset-password');
     final route = isReset

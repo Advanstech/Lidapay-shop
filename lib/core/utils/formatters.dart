@@ -46,6 +46,14 @@ class Formatters {
     return DateFormat('d MMM yyyy').format(dt.toLocal());
   }
 
+  /// `mm:ss` countdown label for resend timers (`2:00` → `0:04`).
+  static String countdown(int totalSeconds) {
+    final clamped = totalSeconds < 0 ? 0 : totalSeconds;
+    final m = clamped ~/ 60;
+    final s = (clamped % 60).toString().padLeft(2, '0');
+    return '$m:$s';
+  }
+
   static String maskedPhone(String phone) {
     if (phone.length < 7) return phone;
     return '${phone.substring(0, 3)}••••${phone.substring(phone.length - 3)}';

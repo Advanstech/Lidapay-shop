@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../../../core/network/api_exception.dart';
@@ -67,6 +69,7 @@ class RemoteAuthRepository implements AuthRepository {
         : <String, dynamic>{
             if (fallbackUsername.isNotEmpty) 'username': fallbackUsername,
           };
+    _fillUserIdFromJwt(userJson, tokens.accessToken);
 
     await _tokens.saveSession(
       accessToken: tokens.accessToken,
@@ -81,12 +84,51 @@ class RemoteAuthRepository implements AuthRepository {
     if (!_tokens.hasSession) return null;
     final access = _tokens.accessToken;
     final refresh = _tokens.refreshToken;
-    final profileJson = _tokens.profileJson;
+    final profileJson = Map<String, dynamic>.from(
+      _tokens.profileJson ?? const {},
+    );
     if (access == null) return null;
+    _fillUserIdFromJwt(profileJson, access);
     return AuthSession(
       tokens: AuthTokens(accessToken: access, refreshToken: refresh),
-      user: UserProfile.fromJson(profileJson ?? const {}),
+      user: UserProfile.fromJson(profileJson),
     );
+  }
+
+  /// The OTP verify response may omit the `user` object, and sessions saved
+  /// before /users/profile ever succeeds lack `_id`. The JWT carries the
+  /// same value as `sub` — decode it so downstream providers always have a
+  /// usable user id.
+  void _fillUserIdFromJwt(Map<String, dynamic> userJson, String accessToken) {
+    final existing = (userJson['_id'] ?? userJson['id'] ?? userJson['userId'])
+        ?.toString()
+        .trim();
+    if (existing != null &&
+        existing.isNotEmpty &&
+        existing != 'undefined' &&
+        existing != 'null') {
+      return;
+    }
+    final id = _jwtClaim(accessToken, const ['sub', 'userId', '_id', 'id']);
+    if (id != null) userJson['_id'] = id;
+  }
+
+  static String? _jwtClaim(String token, List<String> keys) {
+    try {
+      final parts = token.split('.');
+      if (parts.length != 3) return null;
+      var payload = parts[1].replaceAll('-', '+').replaceAll('_', '/');
+      payload += '=' * ((4 - payload.length % 4) % 4);
+      final json = jsonDecode(utf8.decode(base64Decode(payload)));
+      if (json is! Map) return null;
+      for (final key in keys) {
+        final value = json[key];
+        if (value != null && value.toString().isNotEmpty) {
+          return value.toString();
+        }
+      }
+    } catch (_) {}
+    return null;
   }
 
   @override

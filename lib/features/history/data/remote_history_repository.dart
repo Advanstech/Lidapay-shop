@@ -23,7 +23,7 @@ class RemoteHistoryRepository implements HistoryRepository {
     final id = _userId;
     if (id == null || id.isEmpty) {
       throw const ApiException(
-        'Session expired. Please sign in again.',
+        'We\'re finishing your sign-in. Please try again in a moment.',
         statusCode: 401,
       );
     }

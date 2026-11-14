@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/network/api_exception.dart';
 import '../../../core/providers/theme_provider.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_theme.dart';
@@ -79,38 +80,102 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Future<void> _deleteAccount() async {
-    final confirmed = await showDialog<bool>(
+    // Deliberate two-step gate: a stray tap on "Delete Account" lands on the
+    // prominent "Keep my account" action — confirming requires a separate,
+    // explicitly-labelled destructive press on the bottom sheet.
+    final confirmed = await showModalBottomSheet<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.warning_amber_rounded, color: AppColors.error),
-            SizedBox(width: 8),
-            Text('Delete Account?'),
-          ],
-        ),
-        content: const Text(
-          'This opens an email request to Advansis support. Send the email '
-          'to request account and personal-data deletion; support may verify '
-          'account ownership before completing it. Some transaction records '
-          'may be retained where the law requires. Withdraw or spend any '
-          'remaining wallet balance first.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Open email'),
-          ),
-        ],
+      showDragHandle: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
+      builder: (ctx) {
+        final scheme = Theme.of(ctx).colorScheme;
+        final text = Theme.of(ctx).textTheme;
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 4, 24, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    color: AppColors.error.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Icon(
+                    Icons.delete_forever_rounded,
+                    color: AppColors.error,
+                    size: 32,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Delete your account?',
+                  style: text.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'This opens an email request to Advansis support — sending '
+                  'it requests account and personal-data deletion. Support may '
+                  'verify ownership before completing it, and some transaction '
+                  'records may be retained where the law requires. Withdraw or '
+                  'spend any remaining wallet balance first.',
+                  textAlign: TextAlign.center,
+                  style: text.bodyMedium?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                    height: 1.45,
+                  ),
+                ),
+                const SizedBox(height: 22),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 15),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    onPressed: () => Navigator.of(ctx).pop(false),
+                    child: const Text(
+                      'Keep my account',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.error,
+                      side: BorderSide(
+                        color: AppColors.error.withValues(alpha: 0.6),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 15),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    onPressed: () => Navigator.of(ctx).pop(true),
+                    icon: const Icon(Icons.mail_outline_rounded, size: 18),
+                    label: const Text(
+                      'Continue to deletion request',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
     if (confirmed != true || !mounted || _isPreparingDeletionRequest) return;
 
@@ -805,7 +870,10 @@ class _ProfileBrandHero extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(width: 8),
-                            _ContactStatusChip(verified: user!.emailVerified),
+                            _ContactStatusChip(
+                              verified: user!.emailVerified,
+                              kind: _ContactKind.email,
+                            ),
                           ],
                         ),
                       if (user?.email.isNotEmpty == true &&
@@ -840,7 +908,10 @@ class _ProfileBrandHero extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(width: 8),
-                            _ContactStatusChip(verified: user!.phoneVerified),
+                            _ContactStatusChip(
+                              verified: user!.phoneVerified,
+                              kind: _ContactKind.phone,
+                            ),
                           ],
                         ),
                     ],
@@ -893,38 +964,187 @@ class _ProfileBrandHero extends StatelessWidget {
   }
 }
 
-class _ContactStatusChip extends StatelessWidget {
-  const _ContactStatusChip({required this.verified});
+enum _ContactKind { email, phone }
+
+class _ContactStatusChip extends ConsumerStatefulWidget {
+  const _ContactStatusChip({required this.verified, required this.kind});
 
   final bool verified;
+  final _ContactKind kind;
+
+  @override
+  ConsumerState<_ContactStatusChip> createState() =>
+      _ContactStatusChipState();
+}
+
+class _ContactStatusChipState extends ConsumerState<_ContactStatusChip> {
+  bool _busy = false;
+
+  void _snack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  Future<void> _verifyEmail() async {
+    setState(() => _busy = true);
+    try {
+      await ref.read(authSessionProvider.notifier).resendEmailVerification();
+      _snack('Verification email sent — check your inbox and spam folder.');
+    } on ApiException catch (e) {
+      _snack(e.message);
+    } catch (_) {
+      _snack('Could not send the verification email. Try again in a moment.');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _verifyPhone() async {
+    setState(() => _busy = true);
+    try {
+      await ref.read(authSessionProvider.notifier).resendPhoneVerification();
+      if (!mounted) return;
+      final confirmed = await _enterPhoneCode();
+      if (confirmed == true && mounted) {
+        _snack('Phone number verified.');
+      }
+    } on ApiException catch (e) {
+      _snack(e.message);
+    } catch (_) {
+      _snack('Could not send the SMS code. Try again in a moment.');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<bool?> _enterPhoneCode() {
+    final codeController = TextEditingController();
+    var submitting = false;
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Enter SMS code'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'We texted a verification code to your phone. Enter it here.',
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: codeController,
+                keyboardType: TextInputType.number,
+                maxLength: 8,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  hintText: 'Code from SMS',
+                  counterText: '',
+                ),
+                onSubmitted: (_) async {
+                  setDialogState(() => submitting = true);
+                  final ok = await _submitPhoneCode(codeController.text.trim());
+                  setDialogState(() => submitting = false);
+                  if (ok && ctx.mounted) Navigator.of(ctx).pop(true);
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: submitting ? null : () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: submitting
+                  ? null
+                  : () async {
+                      setDialogState(() => submitting = true);
+                      final ok =
+                          await _submitPhoneCode(codeController.text.trim());
+                      setDialogState(() => submitting = false);
+                      if (ok && ctx.mounted) Navigator.of(ctx).pop(true);
+                    },
+              child: submitting
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Verify'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<bool> _submitPhoneCode(String code) async {
+    if (code.isEmpty) {
+      _snack('Enter the code from the SMS first.');
+      return false;
+    }
+    final phone = ref.read(authSessionProvider)?.user.phoneNumber ?? '';
+    try {
+      await ref
+          .read(authSessionProvider.notifier)
+          .confirmPhoneVerification(phoneNumber: phone, code: code);
+      return true;
+    } on ApiException catch (e) {
+      _snack(e.message);
+    } catch (_) {
+      _snack('That code did not work. Check it and try again.');
+    }
+    return false;
+  }
 
   @override
   Widget build(BuildContext context) {
-    final fg = verified ? const Color(0xFF6BF097) : const Color(0xFFFFD479);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
-      decoration: BoxDecoration(
-        color: fg.withValues(alpha: 0.16),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            verified ? Icons.check_circle_rounded : Icons.schedule_rounded,
-            size: 11,
-            color: fg,
-          ),
-          const SizedBox(width: 4),
-          Text(
-            verified ? 'Verified' : 'Verify',
-            style: TextStyle(
-              color: fg,
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
+    final fg =
+        widget.verified ? const Color(0xFF6BF097) : const Color(0xFFFFD479);
+    return GestureDetector(
+      onTap: widget.verified || _busy
+          ? null
+          : widget.kind == _ContactKind.email
+              ? _verifyEmail
+              : _verifyPhone,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+        decoration: BoxDecoration(
+          color: fg.withValues(alpha: 0.16),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_busy)
+              SizedBox(
+                width: 11,
+                height: 11,
+                child: CircularProgressIndicator(strokeWidth: 1.6, color: fg),
+              )
+            else
+              Icon(
+                widget.verified
+                    ? Icons.check_circle_rounded
+                    : Icons.schedule_rounded,
+                size: 11,
+                color: fg,
+              ),
+            const SizedBox(width: 4),
+            Text(
+              widget.verified ? 'Verified' : 'Verify',
+              style: TextStyle(
+                color: fg,
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1309,14 +1529,14 @@ class _KycProgressCard extends ConsumerWidget {
         done: u?.emailVerified == true,
         action: u?.emailVerified == true
             ? null
-            : () => _resend(context, ref, email: true),
+            : () => _resendEmail(context, ref),
+        actionLabel: 'Verify',
       ),
+      // Phone verification stays status-only here — the SMS code flow is
+      // deferred to the One4All SMS implementation.
       _KycItem(
         label: 'Phone verified',
         done: u?.phoneVerified == true,
-        action: u?.phoneVerified == true
-            ? null
-            : () => _resend(context, ref, email: false),
       ),
       _KycItem(
         label: 'Delivery address & GPS set',
@@ -1384,25 +1604,16 @@ class _KycProgressCard extends ConsumerWidget {
     );
   }
 
-  static Future<void> _resend(
-    BuildContext context,
-    WidgetRef ref, {
-    required bool email,
-  }) async {
+  static Future<void> _resendEmail(BuildContext context, WidgetRef ref) async {
     final notifier = ref.read(authSessionProvider.notifier);
     try {
-      if (email) {
-        await notifier.resendEmailVerification();
-      } else {
-        await notifier.resendPhoneVerification();
-      }
+      await notifier.resendEmailVerification();
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          const SnackBar(
             content: Text(
-              email
-                  ? 'Verification email resent — check your inbox.'
-                  : 'Verification code resent to your phone.',
+              'Verification email sent — check your inbox. '
+              'If the link expired, tap Verify again for a new one.',
             ),
           ),
         );

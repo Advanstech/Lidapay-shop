@@ -10,7 +10,7 @@ class AppConstants {
 
   static const Duration apiTimeout = Duration(seconds: 30);
   static const Duration apiConnectTimeout = Duration(seconds: 15);
-  static const Duration otpResendCooldown = Duration(seconds: 45);
+  static const Duration otpResendCooldown = Duration(minutes: 2);
 
   static const String appName = 'Lidapay';
   static const String appVersion = '1.0.0';
