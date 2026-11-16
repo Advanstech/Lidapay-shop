@@ -98,6 +98,12 @@ class RemotePaymentsRepository implements PaymentsRepository {
     final body = await _api.post(
       ApiEndpoints.gtPayStatus,
       body: {'PartnerTransId': partnerTransId},
+    ).timeout(
+      const Duration(seconds: 10),
+      onTimeout: () => throw const ApiException(
+        'The mobile money network did not respond in time.',
+        statusCode: 504,
+      ),
     );
     return GtPayResult.fromJson(body);
   }

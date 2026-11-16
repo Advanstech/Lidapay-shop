@@ -133,8 +133,8 @@ class PaymentSessionNotifier extends StateNotifier<PaymentSessionState> {
     this._currentUser, {
     int queryAttempts = 8,
     Duration queryDelay = const Duration(seconds: 4),
-    int gtPayPollAttempts = 15,
-    Duration gtPayPollDelay = const Duration(seconds: 8),
+    int gtPayPollAttempts = 4,
+    Duration gtPayPollDelay = const Duration(seconds: 2),
     Duration gtPayExpireAfter = const Duration(minutes: 5),
   }) : _queryAttempts = queryAttempts,
        _queryDelay = queryDelay,
@@ -549,8 +549,13 @@ class PaymentSessionNotifier extends StateNotifier<PaymentSessionState> {
         // send a new prompt, or cancel.
         sawFailure = result.outcome == PaymentOutcome.failed;
         lastMessage = result.message;
+      } on ApiException catch (e) {
+        // A 504 timeout means GTBank is not responding — stop polling and
+        // let the user check status manually instead of hanging.
+        if (e.statusCode == 504) break;
+        // Other transient failures are unknown, not failure — keep going.
       } catch (_) {
-        // Transient lookup failures are unknown, not failure — keep going.
+        // Non-API failures are unknown, not failure — keep going.
       }
     }
     expired = expired || !DateTime.now().isBefore(expiresAt);
