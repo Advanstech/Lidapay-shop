@@ -56,4 +56,18 @@ class RemoteNotificationsRepository implements NotificationsRepository {
       body: {'token': token},
     );
   }
+
+  @override
+  Future<int> getActiveDeviceTokenCount() async {
+    final raw = await _api.getRaw(ApiEndpoints.deviceToken);
+    final pool = payloadPool(asMap(raw));
+    final tokens = pool['tokens'];
+    if (tokens is List) {
+      return tokens
+          .whereType<Map>()
+          .where((item) => item['isActive'] != false)
+          .length;
+    }
+    return numberField(pool, const ['total', 'count'])?.toInt() ?? 0;
+  }
 }

@@ -13,6 +13,9 @@ import '../../../core/widgets/surface_card.dart';
 import '../../auth/providers.dart';
 import '../../history/widgets/transaction_details_sheet.dart';
 import '../../notifications/providers.dart';
+import '../../recipient_choice/data/recipient_models.dart';
+import '../../recipient_choice/providers.dart';
+import '../../recipient_choice/widgets/pending_recipient_decisions_banner.dart';
 import '../../shop/data/shop_models.dart';
 import '../../shop/providers.dart';
 import '../data/dashboard_models.dart';
@@ -37,6 +40,7 @@ class DashboardScreen extends ConsumerWidget {
         ref.read(recentTransactionsProvider.future),
         ref.read(flashDealsProvider.future),
         ref.read(rawNotificationsProvider.future),
+        ref.read(pendingRecipientDecisionsProvider.notifier).refresh(),
       ]);
     } catch (_) {
       // Sections surface their own state; the refresh gesture still ends.
@@ -45,6 +49,19 @@ class DashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.listen<List<RecipientDecision>>(pendingRecipientDecisionsProvider, (_, _) {
+      final next = ref
+          .read(pendingRecipientDecisionsProvider.notifier)
+          .claimNextToSurface();
+      if (next != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (context.mounted) {
+            context.push(AppRoutes.recipientDecision(next.decisionId));
+          }
+        });
+      }
+    });
+
     final user = ref.watch(authSessionProvider)?.user;
     final wallet = ref.watch(walletSummaryProvider);
     final transactions = ref.watch(recentTransactionsProvider);
@@ -122,6 +139,7 @@ class DashboardScreen extends ConsumerWidget {
                     const SizedBox.shrink(),
               ),
             ),
+            const SliverToBoxAdapter(child: PendingRecipientDecisionsBanner()),
             const SliverToBoxAdapter(child: PendingTopupsCard()),
             const SliverToBoxAdapter(child: SizedBox(height: 16)),
             SliverToBoxAdapter(

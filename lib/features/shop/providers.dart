@@ -173,11 +173,13 @@ class CartController extends StateNotifier<AsyncValue<Cart>> {
   Future<ShopOrder?> checkout(
     ShippingAddress address, {
     String paymentMethod = 'momo',
+    double? deliveryDistanceKm,
   }) async {
     try {
       final order = await _repository.checkout(
         shippingAddress: address,
         paymentMethod: paymentMethod,
+        deliveryDistanceKm: deliveryDistanceKm,
       );
       state = AsyncData(await _repository.getCart());
       return order;

@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:lidapay_app/core/deep_links.dart';
 import 'package:lidapay_app/core/network/api_client.dart';
 import 'package:lidapay_app/core/network/token_store.dart';
 import 'package:lidapay_app/features/auth/data/auth_models.dart';
@@ -734,6 +735,43 @@ void main() {
       // One status query to catch a late approval — never a poll window.
       expect(payments.gtPayStatusIds, hasLength(1));
       expect(services.calls, isEmpty);
+    });
+
+    test('PaymentDeepLinkHandler parses ExpressPay redirect-url callbacks', () {
+      final uri = Uri.parse(
+        'lidapay://redirect-url?orderId=ADV-9&token=tok-1&status=success',
+      );
+      expect(PaymentDeepLinkHandler.isPaymentReturn(uri), isTrue);
+      expect(PaymentDeepLinkHandler.isPasswordLink(uri), isFalse);
+      final target = PaymentDeepLinkHandler.callbackRouteFor(uri);
+      expect(
+        target,
+        '/payment/callback?status=success&orderId=ADV-9&hasToken=1',
+      );
+    });
+
+    test('handleReturn reconciles shop order when orderId is shop orderNumber',
+        () async {
+      final (session, payments, _) = await _session();
+      payments.queue.add(const PaymentQueryResult(status: 'PAID'));
+      await session.beginPayment(
+        PendingPayment.shopOrder(
+          reference: 'LDP-SHOP-1',
+          orderId: 'mongo-ord-1',
+          orderNumber: 'LPS261116000099',
+          total: 120,
+          currency: 'GHS',
+        ),
+      );
+      await session.handleReturn(
+        status: 'success',
+        orderId: 'LPS261116000099',
+        token: 'present',
+      );
+
+      expect(payments.queryCalls, 1);
+      expect(session.state.phase, PaymentPhase.completed);
+      expect(session.state.shopOrderNumber, 'LPS261116000099');
     });
   });
 }

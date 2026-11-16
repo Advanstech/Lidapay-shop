@@ -946,6 +946,13 @@ class _AirtimeScreenState extends ConsumerState<AirtimeScreen>
     // here; a terminal failure leaves the wizard on the confirm step.
     ref.listen<PaymentSessionState>(paymentSessionProvider, (prev, next) {
       if (!mounted) return;
+      // When the deep-link callback route (`PaymentReturnScreen`) is sitting
+      // above this wizard, let it present the receipt without resetting the
+      // session out from under it.
+      if (!(ModalRoute.of(context)?.isCurrent ?? true)) {
+        if (next.phase == PaymentPhase.completed) _invalidateActivityFeeds();
+        return;
+      }
       if (next.phase == PaymentPhase.completed && next.receipt != null) {
         setState(() => _receipt = next.receipt);
         ref.read(paymentSessionProvider.notifier).reset();

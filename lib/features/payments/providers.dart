@@ -357,11 +357,13 @@ class PaymentSessionNotifier extends StateNotifier<PaymentSessionState> {
     _pending = pending;
 
     final savedOrderId = pending.advansisOrderId;
+    final savedShopOrderNumber = pending.params['orderNumber']?.toString();
     if (orderId != null &&
         orderId.isNotEmpty &&
         savedOrderId != null &&
         savedOrderId.isNotEmpty &&
-        orderId != savedOrderId) {
+        orderId != savedOrderId &&
+        orderId != savedShopOrderNumber) {
       state = PaymentSessionState(
         phase: PaymentPhase.awaitingCallback,
         pending: pending,

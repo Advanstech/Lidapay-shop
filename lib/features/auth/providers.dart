@@ -27,6 +27,8 @@ final authSessionProvider = StateNotifierProvider<AuthNotifier, AuthSession?>((
     ref.watch(authRepositoryProvider),
     ref.watch(tokenStoreProvider),
     deviceIdentity: ref.watch(deviceIdentityProvider),
+    deviceTokenProvider: () =>
+        ref.read(pushNotificationServiceProvider).currentToken,
     onAuthenticated: () =>
         ref.read(pushNotificationServiceProvider).syncDeviceToken(),
     onLoggingOut: () =>
@@ -51,6 +53,7 @@ class AuthNotifier extends StateNotifier<AuthSession?> {
     this._repository,
     this._tokens, {
     this.deviceIdentity,
+    this.deviceTokenProvider,
     this.onAuthenticated,
     this.onLoggingOut,
   }) : super(null) {
@@ -62,6 +65,7 @@ class AuthNotifier extends StateNotifier<AuthSession?> {
   final AuthRepository _repository;
   final TokenStore _tokens;
   final DeviceIdentity? deviceIdentity;
+  final String? Function()? deviceTokenProvider;
   final Future<void> Function()? onAuthenticated;
   final Future<void> Function()? onLoggingOut;
 
@@ -83,7 +87,15 @@ class AuthNotifier extends StateNotifier<AuthSession?> {
 
   /// POST /api/v1/users/login — one request returns the session.
   Future<void> login(LoginRequest request) async {
-    state = await _repository.login(request);
+    final identity = deviceIdentity;
+    final enriched = request.withDevice(
+      deviceToken: deviceTokenProvider?.call(),
+      devicePlatform: identity?.platform,
+      deviceId: identity?.deviceId,
+      appVersion: identity?.appVersion,
+      locale: identity?.locale,
+    );
+    state = await _repository.login(enriched);
     _pendingOtpChallenge = null;
     _pendingOtpUsername = null;
     unawaited(refreshProfile());
@@ -128,6 +140,7 @@ class AuthNotifier extends StateNotifier<AuthSession?> {
         challengeToken: token,
         otpCode: otpCode,
         username: username,
+        deviceToken: deviceTokenProvider?.call(),
         deviceId: identity?.deviceId,
         devicePlatform: identity?.platform,
         appVersion: identity?.appVersion,
@@ -225,11 +238,31 @@ class AuthNotifier extends StateNotifier<AuthSession?> {
     }
   }
 
-  Future<void> register(RegisterRequest request) =>
-      _repository.register(request);
+  Future<void> register(RegisterRequest request) {
+    final identity = deviceIdentity;
+    return _repository.register(
+      request.withDevice(
+        deviceToken: deviceTokenProvider?.call(),
+        devicePlatform: identity?.platform,
+        deviceId: identity?.deviceId,
+        appVersion: identity?.appVersion,
+        locale: identity?.locale,
+      ),
+    );
+  }
 
-  Future<void> registerMerchant(MerchantRegisterRequest request) =>
-      _repository.registerMerchant(request);
+  Future<void> registerMerchant(MerchantRegisterRequest request) {
+    final identity = deviceIdentity;
+    return _repository.registerMerchant(
+      request.withDevice(
+        deviceToken: deviceTokenProvider?.call(),
+        devicePlatform: identity?.platform,
+        deviceId: identity?.deviceId,
+        appVersion: identity?.appVersion,
+        locale: identity?.locale,
+      ),
+    );
+  }
 
   /// PUT /api/v1/users/profile/update — keeps the current tokens.
   Future<UserProfile> updateProfile(ProfileUpdateRequest request) async {

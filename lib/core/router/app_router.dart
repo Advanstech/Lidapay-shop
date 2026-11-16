@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../deep_links.dart';
 import '../../features/auth/providers.dart';
 import '../../features/auth/screens/change_password_screen.dart';
 import '../../features/auth/screens/forgot_password_screen.dart';
@@ -105,21 +106,31 @@ final routerProvider = Provider<GoRouter>((ref) {
     debugLogDiagnostics: false,
     refreshListenable: refresh,
     redirect: (context, state) async {
-      // `lidapay://` URIs are delivered to the AppLinks stream too; keep the
-      // custom scheme out of go_router entirely and let the payment
-      // deep-link handler push the callback route itself, except for the
-      // post-reset login return which needs no parked session.
+      // Android delivers custom-scheme intents (`lidapay://...`) into GoRouter's
+      // route parser as well as the AppLinks stream. Never bounce payment
+      // callbacks back to `/splash` — doing so tears down the active flow and
+      // restarts the app instead of verifying and showing the receipt.
       if (state.uri.scheme.isNotEmpty &&
           state.uri.scheme != 'http' &&
           state.uri.scheme != 'https') {
-        if (state.uri.scheme == 'lidapay' &&
-            (state.uri.host == 'auth' ||
-                state.uri.path.contains('password-reset-complete')) &&
-            state.uri.path.contains('password-reset-complete')) {
-          return Uri(
-            path: AppRoutes.login,
-            queryParameters: const {'passwordReset': '1'},
-          ).toString();
+        if (PaymentDeepLinkHandler.isPasswordLink(state.uri)) {
+          return PaymentDeepLinkHandler.passwordRouteFor(state.uri);
+        }
+        if (PaymentDeepLinkHandler.isPaymentReturn(state.uri)) {
+          var hasSession = ref.read(hasSessionProvider);
+          if (!hasSession) {
+            final auth = ref.read(authSessionProvider.notifier);
+            if (!auth.didAttemptRestore) {
+              await auth.restore();
+            }
+            hasSession = ref.read(hasSessionProvider);
+          }
+          if (hasSession) {
+            return PaymentDeepLinkHandler.callbackRouteFor(state.uri);
+          }
+          final prefs = await SharedPreferences.getInstance();
+          final seenOnboarding = prefs.getBool(_onboardingKey) ?? false;
+          return seenOnboarding ? AppRoutes.login : AppRoutes.onboarding;
         }
         return AppRoutes.splash;
       }

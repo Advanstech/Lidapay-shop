@@ -10,6 +10,8 @@ import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/feedback_views.dart';
 import '../../../core/widgets/skeleton.dart';
+import '../../recipient_choice/providers.dart';
+import '../../recipient_choice/widgets/pending_recipient_decisions_banner.dart';
 import '../data/notification_models.dart';
 import '../providers.dart';
 
@@ -21,7 +23,10 @@ class NotificationsScreen extends ConsumerWidget {
   Future<void> _refresh(WidgetRef ref) async {
     ref.invalidate(rawNotificationsProvider);
     try {
-      await ref.read(rawNotificationsProvider.future);
+      await Future.wait([
+        ref.read(rawNotificationsProvider.future),
+        ref.read(pendingRecipientDecisionsProvider.notifier).refresh(),
+      ]);
     } catch (_) {
       // The error state surfaces inline.
     }
@@ -116,6 +121,7 @@ class NotificationsScreen extends ConsumerWidget {
             onBack: () => context.pop(),
             onMarkAll: unread == 0 ? null : () => _markAllRead(ref),
           ),
+          const PendingRecipientDecisionsBanner(),
           Expanded(
             child: notifications.when(
               loading: () => ListView(

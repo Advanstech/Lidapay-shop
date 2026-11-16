@@ -938,6 +938,49 @@ void main() {
     expect(order.deliveryUpdates.single.status, 'order_placed');
   });
 
+  test(
+    'shop checkout omits absent coordinates, never sends deliveryFee, and reads deliveryDistance',
+    () async {
+      final (api, adapter) = await _client(
+        (_) => {
+          'order': {
+            '_id': 'o9',
+            'orderNumber': 'LPS261116000001',
+            'subtotal': 100,
+            'deliveryFee': 15,
+            'total': 115,
+            'currency': 'GHS',
+            'deliveryDistance': {'km': 8.6, 'source': 'client'},
+          },
+        },
+      );
+      final order = await RemoteShopRepository(api).checkout(
+        shippingAddress: const ShippingAddress(
+          fullName: 'Ama Mensah',
+          phone: '0244588584',
+          addressLine1: '12 Osu Avenue',
+          city: 'Accra',
+          region: 'Greater Accra',
+          country: 'Ghana',
+        ),
+        paymentMethod: 'card',
+        deliveryFee: 99,
+        deliveryDistanceKm: 8.6,
+      );
+
+      final sent = adapter.requests.single.data as Map<String, dynamic>;
+      final address = sent['shippingAddress'] as Map<String, dynamic>;
+      expect(address.containsKey('latitude'), isFalse);
+      expect(address.containsKey('longitude'), isFalse);
+      expect(sent.containsKey('deliveryFee'), isFalse);
+      expect(sent['deliveryDistanceKm'], 8.6);
+      expect(order.deliveryFee, 15);
+      expect(order.total, 115);
+      expect(order.deliveryDistanceKm, 8.6);
+      expect(order.deliveryDistanceSource, 'client');
+    },
+  );
+
   test('shop tracking reads deliveryUpdates with dates and address', () async {
     final (api, _) = await _client(
       (_) => {

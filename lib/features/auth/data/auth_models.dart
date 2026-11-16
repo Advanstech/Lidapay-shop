@@ -3,6 +3,24 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:equatable/equatable.dart';
 
+Map<String, dynamic> _deviceMetaJson({
+  String? deviceToken,
+  String? devicePlatform,
+  String? deviceId,
+  String? appVersion,
+  String? locale,
+}) => {
+  if (deviceToken != null && deviceToken.isNotEmpty) 'deviceToken': deviceToken,
+  if (devicePlatform != null && devicePlatform.isNotEmpty)
+    'devicePlatform': devicePlatform,
+  if (deviceId != null &&
+      deviceId.isNotEmpty &&
+      deviceId.toLowerCase() != 'unknown')
+    'deviceId': deviceId,
+  if (appVersion != null && appVersion.isNotEmpty) 'appVersion': appVersion,
+  if (locale != null && locale.isNotEmpty) 'locale': locale,
+};
+
 /// Mirrors POST /api/v1/users/register (see api/openapi.json).
 class RegisterRequest extends Equatable {
   const RegisterRequest({
@@ -12,6 +30,11 @@ class RegisterRequest extends Equatable {
     required this.phoneNumber,
     required this.country,
     required this.password,
+    this.deviceToken,
+    this.devicePlatform,
+    this.deviceId,
+    this.appVersion,
+    this.locale,
   });
 
   final String firstName;
@@ -20,6 +43,31 @@ class RegisterRequest extends Equatable {
   final String phoneNumber;
   final String country;
   final String password;
+  final String? deviceToken;
+  final String? devicePlatform;
+  final String? deviceId;
+  final String? appVersion;
+  final String? locale;
+
+  RegisterRequest withDevice({
+    String? deviceToken,
+    String? devicePlatform,
+    String? deviceId,
+    String? appVersion,
+    String? locale,
+  }) => RegisterRequest(
+    firstName: firstName,
+    lastName: lastName,
+    email: email,
+    phoneNumber: phoneNumber,
+    country: country,
+    password: password,
+    deviceToken: this.deviceToken ?? deviceToken,
+    devicePlatform: this.devicePlatform ?? devicePlatform,
+    deviceId: this.deviceId ?? deviceId,
+    appVersion: this.appVersion ?? appVersion,
+    locale: this.locale ?? locale,
+  );
 
   Map<String, dynamic> toJson() => {
     'username': phoneNumber,
@@ -31,6 +79,13 @@ class RegisterRequest extends Equatable {
     'country': country,
     'password': password,
     'roles': ['user'],
+    ..._deviceMetaJson(
+      deviceToken: deviceToken,
+      devicePlatform: devicePlatform,
+      deviceId: deviceId,
+      appVersion: appVersion,
+      locale: locale,
+    ),
   };
 
   @override
@@ -41,6 +96,11 @@ class RegisterRequest extends Equatable {
     phoneNumber,
     country,
     password,
+    deviceToken,
+    devicePlatform,
+    deviceId,
+    appVersion,
+    locale,
   ];
 }
 
@@ -55,6 +115,11 @@ class MerchantRegisterRequest extends Equatable {
     this.businessType,
     this.street,
     this.city,
+    this.deviceToken,
+    this.devicePlatform,
+    this.deviceId,
+    this.appVersion,
+    this.locale,
   });
 
   final String name;
@@ -65,6 +130,33 @@ class MerchantRegisterRequest extends Equatable {
   final String? businessType;
   final String? street;
   final String? city;
+  final String? deviceToken;
+  final String? devicePlatform;
+  final String? deviceId;
+  final String? appVersion;
+  final String? locale;
+
+  MerchantRegisterRequest withDevice({
+    String? deviceToken,
+    String? devicePlatform,
+    String? deviceId,
+    String? appVersion,
+    String? locale,
+  }) => MerchantRegisterRequest(
+    name: name,
+    email: email,
+    phoneNumber: phoneNumber,
+    password: password,
+    country: country,
+    businessType: businessType,
+    street: street,
+    city: city,
+    deviceToken: this.deviceToken ?? deviceToken,
+    devicePlatform: this.devicePlatform ?? devicePlatform,
+    deviceId: this.deviceId ?? deviceId,
+    appVersion: this.appVersion ?? appVersion,
+    locale: this.locale ?? locale,
+  );
 
   Map<String, dynamic> toJson() => {
     'name': name,
@@ -75,6 +167,13 @@ class MerchantRegisterRequest extends Equatable {
     if (businessType?.isNotEmpty == true) 'businessType': businessType,
     if (street?.isNotEmpty == true) 'street': street,
     if (city?.isNotEmpty == true) 'city': city,
+    ..._deviceMetaJson(
+      deviceToken: deviceToken,
+      devicePlatform: devicePlatform,
+      deviceId: deviceId,
+      appVersion: appVersion,
+      locale: locale,
+    ),
   };
 
   @override
@@ -87,20 +186,72 @@ class MerchantRegisterRequest extends Equatable {
     businessType,
     street,
     city,
+    deviceToken,
+    devicePlatform,
+    deviceId,
+    appVersion,
+    locale,
   ];
 }
 
 /// Mirrors POST /api/v1/users/login — username may be email or phone.
 class LoginRequest extends Equatable {
-  const LoginRequest({required this.username, required this.password});
+  const LoginRequest({
+    required this.username,
+    required this.password,
+    this.deviceToken,
+    this.devicePlatform,
+    this.deviceId,
+    this.appVersion,
+    this.locale,
+  });
 
   final String username;
   final String password;
+  final String? deviceToken;
+  final String? devicePlatform;
+  final String? deviceId;
+  final String? appVersion;
+  final String? locale;
 
-  Map<String, dynamic> toJson() => {'username': username, 'password': password};
+  LoginRequest withDevice({
+    String? deviceToken,
+    String? devicePlatform,
+    String? deviceId,
+    String? appVersion,
+    String? locale,
+  }) => LoginRequest(
+    username: username,
+    password: password,
+    deviceToken: this.deviceToken ?? deviceToken,
+    devicePlatform: this.devicePlatform ?? devicePlatform,
+    deviceId: this.deviceId ?? deviceId,
+    appVersion: this.appVersion ?? appVersion,
+    locale: this.locale ?? locale,
+  );
+
+  Map<String, dynamic> toJson() => {
+    'username': username,
+    'password': password,
+    ..._deviceMetaJson(
+      deviceToken: deviceToken,
+      devicePlatform: devicePlatform,
+      deviceId: deviceId,
+      appVersion: appVersion,
+      locale: locale,
+    ),
+  };
 
   @override
-  List<Object?> get props => [username, password];
+  List<Object?> get props => [
+    username,
+    password,
+    deviceToken,
+    devicePlatform,
+    deviceId,
+    appVersion,
+    locale,
+  ];
 }
 
 /// Request payload for POST /api/v1/auth/login/request-otp.
@@ -180,13 +331,13 @@ class OtpVerifyRequest extends Equatable {
   Map<String, dynamic> toJson() => {
     'challengeToken': challengeToken,
     'otpCode': otpCode,
-    if (deviceToken != null && deviceToken!.isNotEmpty)
-      'deviceToken': deviceToken,
-    if (devicePlatform != null && devicePlatform!.isNotEmpty)
-      'devicePlatform': devicePlatform,
-    if (deviceId != null && deviceId!.isNotEmpty) 'deviceId': deviceId,
-    if (appVersion != null && appVersion!.isNotEmpty) 'appVersion': appVersion,
-    if (locale != null && locale!.isNotEmpty) 'locale': locale,
+    ..._deviceMetaJson(
+      deviceToken: deviceToken,
+      devicePlatform: devicePlatform,
+      deviceId: deviceId,
+      appVersion: appVersion,
+      locale: locale,
+    ),
   };
 
   @override

@@ -1,20 +1,23 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../recipient_choice/providers.dart';
 
 /// Bottom navigation hosting the five top-level tabs behind a floating,
 /// frosted dock with an elevated gradient action in the centre.
-class MainShell extends StatelessWidget {
+class MainShell extends ConsumerWidget {
   const MainShell({super.key, required this.navigationShell});
 
   final StatefulNavigationShell navigationShell;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isShopBranch = navigationShell.currentIndex == 2;
     return Scaffold(
       extendBody: !isShopBranch,
@@ -23,10 +26,17 @@ class MainShell extends StatelessWidget {
           ? null
           : MainDock(
               selectedIndex: navigationShell.currentIndex,
-              onSelect: (index) => navigationShell.goBranch(
-                index,
-                initialLocation: index == navigationShell.currentIndex,
-              ),
+              onSelect: (index) {
+                if (index == 0) {
+                  unawaited(
+                    ref.read(pendingRecipientDecisionsProvider.notifier).refresh(),
+                  );
+                }
+                navigationShell.goBranch(
+                  index,
+                  initialLocation: index == navigationShell.currentIndex,
+                );
+              },
             ),
     );
   }

@@ -14,6 +14,11 @@ abstract class RecipientChoiceRepository {
     String? countryIsoCode,
   });
 
+  /// `GET /recipient-decisions/pending` — every active pending decision
+  /// waiting on the currently signed-in recipient (in-app recovery fallback
+  /// when push notifications were delayed, muted, or missed).
+  Future<List<RecipientDecision>> getPendingDecisions();
+
   /// `GET /recipient-decisions/{decisionId}` — the recipient's view of a
   /// parked delivery.
   Future<RecipientDecision> getDecision(String decisionId);

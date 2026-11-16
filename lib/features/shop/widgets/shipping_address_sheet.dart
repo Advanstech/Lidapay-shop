@@ -77,10 +77,10 @@ class _ShippingAddressSheetState extends State<_ShippingAddressSheet> {
     text: widget.initial?.deliveryInstructions ?? '',
   );
 
-  /// Customer delivery-pin coordinates — required by the checkout contract;
-  /// the backend computes the courier distance from them.
+  /// Optional customer delivery-pin coordinates. Sent only when both lat/lng
+  /// are present so customers who decline map/location can still check out
+  /// with a manual street address.
   DeliveryPin? _pin;
-  bool _pinError = false;
 
   @override
   void initState() {
@@ -120,16 +120,11 @@ class _ShippingAddressSheetState extends State<_ShippingAddressSheet> {
     if (pin == null || !mounted) return;
     setState(() {
       _pin = pin;
-      _pinError = false;
     });
   }
 
   void _submit() {
     if (!(_formKey.currentState?.validate() ?? false)) return;
-    if (_pin == null) {
-      setState(() => _pinError = true);
-      return;
-    }
     HapticFeedback.mediumImpact();
     Navigator.of(context).pop(
       ShippingAddress(
@@ -143,15 +138,14 @@ class _ShippingAddressSheetState extends State<_ShippingAddressSheet> {
         country: _country.text.trim(),
         postalCode: _postalCode.text.trim(),
         deliveryInstructions: _instructions.text.trim(),
-        latitude: _pin!.latitude,
-        longitude: _pin!.longitude,
+        latitude: _pin?.latitude,
+        longitude: _pin?.longitude,
       ),
     );
   }
 
   Widget _pinSection(ColorScheme scheme) {
     final pin = _pin;
-    final errorColor = _pinError ? AppColors.error : scheme.outlineVariant;
     return InkWell(
       onTap: _pickPin,
       borderRadius: BorderRadius.circular(16),
@@ -163,7 +157,7 @@ class _ShippingAddressSheetState extends State<_ShippingAddressSheet> {
               : scheme.surfaceContainerHighest.withValues(alpha: 0.35),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: errorColor.withValues(alpha: _pinError ? 0.9 : 0.5),
+            color: scheme.outlineVariant.withValues(alpha: 0.5),
           ),
         ),
         child: Row(
@@ -189,13 +183,9 @@ class _ShippingAddressSheetState extends State<_ShippingAddressSheet> {
                     pin != null
                         ? '${pin.latitude.toStringAsFixed(5)}, '
                               '${pin.longitude.toStringAsFixed(5)} — tap to adjust'
-                        : _pinError
-                        ? 'Required — drop a pin so the courier can route to you'
-                        : 'Required — tap to drop a pin for the courier',
+                        : 'Optional — tap to drop a pin for courier routing',
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: _pinError
-                          ? AppColors.error
-                          : scheme.onSurfaceVariant,
+                      color: scheme.onSurfaceVariant,
                     ),
                   ),
                 ],

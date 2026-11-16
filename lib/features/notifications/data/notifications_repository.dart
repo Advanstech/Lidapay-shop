@@ -21,4 +21,8 @@ abstract class NotificationsRepository {
   /// DELETE /api/v1/notifications/device-token — deactivates the device push token
   /// for the currently authenticated user on logout or account switch.
   Future<void> unregisterDeviceToken({required String token});
+
+  /// GET /api/v1/notifications/device-token — returns active token count for
+  /// QA/startup verification (`total >= 1` with `isActive: true`).
+  Future<int> getActiveDeviceTokenCount();
 }

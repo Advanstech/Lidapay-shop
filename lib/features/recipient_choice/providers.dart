@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/network/api_client.dart';
+import '../auth/providers.dart';
 import 'data/recipient_choice_repository.dart';
 import 'data/recipient_models.dart';
 import 'data/remote_recipient_choice_repository.dart';
@@ -10,6 +11,88 @@ import 'data/remote_recipient_choice_repository.dart';
 final recipientChoiceRepositoryProvider = Provider<RecipientChoiceRepository>(
   (ref) => RemoteRecipientChoiceRepository(ref.watch(apiClientProvider)),
 );
+
+/// Active pending recipient decisions recovered via
+/// `GET /api/v1/recipient-decisions/pending` so incoming gifts surface reliably
+/// even when OS push notifications are muted, delayed, or missed.
+final pendingRecipientDecisionsProvider =
+    StateNotifierProvider<
+      PendingRecipientDecisionsNotifier,
+      List<RecipientDecision>
+    >((ref) {
+      final session = ref.watch(authSessionProvider);
+      final user = session?.user;
+      final userKey = user == null
+          ? 'anon'
+          : (user.id.isNotEmpty
+                ? user.id
+                : (user.phoneNumber.isNotEmpty
+                      ? user.phoneNumber
+                      : user.username));
+      final notifier = PendingRecipientDecisionsNotifier(
+        ref.watch(recipientChoiceRepositoryProvider),
+        hasSession: session != null,
+        userKey: userKey,
+      );
+      if (session != null) {
+        Future<void>.microtask(notifier.refresh);
+      }
+      return notifier;
+    });
+
+class PendingRecipientDecisionsNotifier
+    extends StateNotifier<List<RecipientDecision>> {
+  PendingRecipientDecisionsNotifier(
+    this._repo, {
+    required bool hasSession,
+    required String userKey,
+  }) : _hasSession = hasSession,
+       _userKey = userKey,
+       super(const []);
+
+  final RecipientChoiceRepository _repo;
+  final bool _hasSession;
+  final String _userKey;
+  final Set<String> _surfacedIds = <String>{};
+  bool _refreshing = false;
+
+  String get userKey => _userKey;
+
+  Future<void> refresh() async {
+    if (!_hasSession || _refreshing) return;
+    _refreshing = true;
+    try {
+      final items = await _repo.getPendingDecisions();
+      if (!mounted) return;
+      final now = DateTime.now();
+      state = items
+          .where(
+            (d) =>
+                d.isPending &&
+                (d.expiresAt == null || d.expiresAt!.isAfter(now)),
+          )
+          .toList();
+    } catch (_) {
+      // Non-fatal recovery probe — keep the current list intact on offline/5xx.
+    } finally {
+      _refreshing = false;
+    }
+  }
+
+  /// Returns the next pending decision not yet auto-surfaced for this
+  /// user/session, marking it claimed so it is only opened once automatically.
+  RecipientDecision? claimNextToSurface() {
+    final now = DateTime.now();
+    for (final d in state) {
+      final active =
+          d.isPending && (d.expiresAt == null || d.expiresAt!.isAfter(now));
+      if (active && _surfacedIds.add(d.decisionId)) {
+        return d;
+      }
+    }
+    return null;
+  }
+}
 
 /// Preflight for the wizard confirm step — tells the sender whether the
 /// destination is a registered account that will be asked to choose between

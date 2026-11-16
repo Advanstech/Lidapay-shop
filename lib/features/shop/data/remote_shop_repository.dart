@@ -107,6 +107,7 @@ class RemoteShopRepository implements ShopRepository {
     required ShippingAddress shippingAddress,
     String paymentMethod = 'momo',
     double deliveryFee = 0,
+    double? deliveryDistanceKm,
   }) async {
     final pool = payloadPool(
       asMap(
@@ -114,8 +115,9 @@ class RemoteShopRepository implements ShopRepository {
           ApiEndpoints.shopCheckout,
           body: {
             'shippingAddress': shippingAddress.toJson(),
+            if (deliveryDistanceKm != null && deliveryDistanceKm > 0)
+              'deliveryDistanceKm': deliveryDistanceKm,
             'paymentMethod': paymentMethod,
-            if (deliveryFee > 0) 'deliveryFee': deliveryFee,
             'redirectUrl': AppConstants.shopCheckoutRedirectUrl,
           },
         ),
@@ -387,6 +389,12 @@ class RemoteShopRepository implements ShopRepository {
         'shippingFee',
         'deliveryCharge',
       ]),
+      deliveryDistanceKm: pool['deliveryDistance'] is Map
+          ? numberField(asMap(pool['deliveryDistance']), const ['km'])
+          : numberField(pool, const ['deliveryDistanceKm']),
+      deliveryDistanceSource: pool['deliveryDistance'] is Map
+          ? stringField(asMap(pool['deliveryDistance']), const ['source'])
+          : null,
       paymentMethod: stringField(pool, const [
         'paymentMethod',
         'payment_method',

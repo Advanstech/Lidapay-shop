@@ -70,4 +70,7 @@ class MockNotificationsRepository implements NotificationsRepository {
 
   @override
   Future<void> unregisterDeviceToken({required String token}) async {}
+
+  @override
+  Future<int> getActiveDeviceTokenCount() async => 1;
 }

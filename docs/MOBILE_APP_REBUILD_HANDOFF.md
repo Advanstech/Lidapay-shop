@@ -283,16 +283,67 @@ must never be added to the app. A provider failure returns HTTP `502`, while
 missing One4All SMS configuration returns HTTP `503`; check the backend logs.
 The link opens a responsive browser form at
 `https://api.advansistechnologies.com/reset-password`; the user enters and
-confirms the new password there. The form submits the token and new password to
-the backend and displays a success or expired-link message. The reset token is
-carried in the URL fragment so it is not sent in the initial page request.
-After a successful reset, the web page shows an **Open LidaPay** action using
-`lidapay://auth/password-reset-complete`. The app team must register and handle
-this route on iOS and Android. It should open the login screen and show a
-password-reset success message; the deep link contains no password or reset
-token. The page also instructs the user to open the app manually if the link
-does not launch it. Do not route this callback through the payment-specific
-`lidapay://redirect-url` handler.
+confirms the new password there (with Show/Hide password review toggles and live
+above-input password requirements that engage as the user types). The form
+submits the token and new password to the backend and displays a success or
+expired-link message. The reset token is carried in the URL fragment so it is
+not sent in the initial page request.
+
+After a successful reset, the completion page provides two return paths:
+1. **Open LidaPay** (mobile deep link): uses `lidapay://auth/password-reset-complete`
+   on iOS and upgrades to an Android Chrome intent URI
+   (`intent://auth/password-reset-complete#Intent;scheme=lidapay;package=com.advansistechnologies.lidapay;S.browser_fallback_url=...;end`)
+   on Android browsers, with a 1.6s visibility check that highlights the web
+   fallback if the app does not open.
+2. **Continue to LidaPay Web** (browser return): links to
+   `PASSWORD_RESET_WEB_RETURN_URL` if configured, or
+   `${APP_URL}?passwordReset=complete` (`https://advansistechnologies.com?passwordReset=complete`).
+
+Partner responsibilities for the return flow:
+- **LidaPay Mobile (Android & iOS)**: Register the `lidapay` URL scheme in
+  `AndroidManifest.xml` (`VIEW` / `DEFAULT` / `BROWSABLE` `<intent-filter>` for
+  package `com.advansistechnologies.lidapay`) and iOS `Info.plist`
+  (`CFBundleURLTypes` -> `lidapay`), then handle the
+  `lidapay://auth/password-reset-complete` route in the app router by opening
+  the login screen with a password-reset success message (the deep link
+  contains no password or reset token). Keep this separate from the
+  payment-specific `lidapay://redirect-url` handler. (Note: the backend serves
+  Android `/.well-known/assetlinks.json`, not an iOS Universal Links
+  `apple-app-site-association` file, so registering `lidapay://` is required.)
+
+  Android (`android/app/src/main/AndroidManifest.xml` inside `MainActivity`):
+  ```xml
+  <intent-filter>
+      <action android:name="android.intent.action.VIEW" />
+      <category android:name="android.intent.category.DEFAULT" />
+      <category android:name="android.intent.category.BROWSABLE" />
+      <data
+          android:scheme="lidapay"
+          android:host="auth"
+          android:path="/password-reset-complete" />
+  </intent-filter>
+  ```
+
+  iOS (`ios/Runner/Info.plist`):
+  ```xml
+  <key>CFBundleURLTypes</key>
+  <array>
+      <dict>
+          <key>CFBundleTypeRole</key>
+          <string>Editor</string>
+          <key>CFBundleURLName</key>
+          <string>com.advansistechnologies.lidapay</string>
+          <key>CFBundleURLSchemes</key>
+          <array>
+              <string>lidapay</string>
+          </array>
+      </dict>
+  </array>
+  ```
+- **LidaPay Web**: When users arrive via **Continue to LidaPay Web** (at
+  `?passwordReset=complete` on `APP_URL`, or at `PASSWORD_RESET_WEB_RETURN_URL`),
+  open the web login view/modal with a password-updated confirmation message and
+  optionally strip the query parameter with `history.replaceState`.
 
 ### Email verification
 
@@ -738,9 +789,43 @@ Do not assume that timeout always appears as an `EXPIRED` terminal state.
 Treat duplicate taps/retries as potentially concurrent; disable the choice
 buttons while a response is in flight and display the server's final decision.
 
+### Recipient-side pending decision recovery (`GET /api/v1/recipient-decisions/pending`)
+
+Do **not** depend exclusively on Firebase push delivery to surface a pending
+choice to the recipient. Whenever a user signs in, opens the app, resumes from
+the background, or opens the Notifications/Home tab, call:
+
+```http
+GET /api/v1/recipient-decisions/pending
+Authorization: Bearer <access_token>
+```
+
+If `count > 0`, immediately display the pending Recipient Choice modal/sheet for
+`decisions[0]` (showing `senderName`, `amount`, `currency`, `serviceType`, and
+`expiresAt` countdown) so users with OS notifications muted, battery-optimized,
+or offline at send time still get their choice before timeout.
+
+### Sender flag rule (`isSelfTopup`)
+
+- Only set `"isSelfTopup": true` when the signed-in user is explicitly executing a
+  **USE** self-topup from their Lida Value dashboard to their own number.
+- For every **SEND** airtime/data screen (both Ghana domestic and Reloadly
+  international), send `"isSelfTopup": false` (never hardcode `true` or pass the
+  string `"false"`).
+
 ## 6. FCM registration, handling, and routing
 
-Register an FCM token against the currently authenticated user:
+**Every phone install must be registered with an active FCM token before a user
+can receive Recipient Choice push notifications.** The mobile rebuild team must
+implement all four rules below:
+
+1. **Send the FCM token in auth payloads AND call the dedicated registration endpoint:**
+   - Include `deviceToken` (or `fcmToken`/`token`), `devicePlatform` (`"ANDROID"` / `"IOS"`),
+     and `deviceId` in `POST /api/v1/users/login`, `POST /api/v1/users/register`,
+     `POST /api/v1/auth/login/verify-otp`, and `POST /api/v1/auth/refresh`.
+   - Also explicitly call `POST /api/v1/notifications/device-token` on authenticated
+     app startup/session restore, on `FirebaseMessaging.instance.onTokenRefresh`,
+     whenever notification permission changes to granted, and after account switch:
 
 ```http
 POST /api/v1/notifications/device-token
@@ -751,17 +836,31 @@ Content-Type: application/json
   "token": "<FCM token>",
   "platform": "ANDROID",
   "provider": "FCM",
-  "deviceId": "<stable app-scoped device ID>",
+  "deviceId": "<persistent per-install UUID, NOT Build.DEVICE>",
   "appVersion": "<version>",
   "locale": "en_GH"
 }
 ```
 
-Register after login and app restore, on `FirebaseMessaging.onTokenRefresh`,
-after permission changes to granted, and after a user/account switch. On
-logout, deactivate the token with `DELETE /api/v1/notifications/device-token`
-using the current authenticated session. Never register a recipient token under
-the sender's account.
+   - **Important when `await`ing FCM token on launch:** If `FirebaseMessaging.instance.getToken()`
+     is still null during login (e.g., slow cold boot or Play Services init), retry
+     fetching the token once the home screen initializes and immediately call
+     `POST /api/v1/notifications/device-token`. The backend accepts `token`,
+     `deviceToken`, `fcmToken`, or `pushToken` (and normalizes platform case),
+     and defaults omitted platform safely, so never skip calling the endpoint.
+2. **Generate a unique per-install UUID for `deviceId` (NEVER `Build.DEVICE`):**
+   - Persist a generated UUID v4 in app storage (`SharedPreferences` /
+     `flutter_secure_storage`) and pass that UUID as `deviceId`.
+   - **Never** send `androidInfo.device` / `Build.DEVICE` (for example
+     `emulator64_x86_64_arm64` or hardware board codenames), because multiple
+     users on the same phone model share the same string.
+3. **Verify registration on QA/staging builds:**
+   - Call `GET /api/v1/notifications/device-token` after login/startup and confirm
+     `data.total >= 1` with `isActive: true`.
+4. **Deactivate only on explicit logout:**
+   - On logout, deactivate the token with `DELETE /api/v1/notifications/device-token`
+     using the current authenticated session. Never register a recipient token under
+     the sender's account.
 
 Handle foreground, background, and notification-open events. Recognize current
 and compatibility values such as `recipient_decision`,
@@ -774,9 +873,10 @@ and compatibility values such as `recipient_decision`,
 
 Use push data to navigate and refresh state, not as the final transaction
 record. If the app is killed and a push arrives, route into the authenticated
-app, fetch the decision from the API, and then show the choice screen only if
-the decision remains pending. Log request/response status and redacted IDs for
-token registration and decision/status polling; never log the FCM token.
+app, fetch the decision from the API (`GET /api/v1/recipient-decisions/{decisionId}`
+or `GET /api/v1/recipient-decisions/pending`), and then show the choice screen
+only if the decision remains pending. Log request/response status and redacted IDs
+for token registration and decision/status polling; never log the FCM token.
 
 ## 7. Deep links and Android navigation
 
@@ -798,16 +898,21 @@ callback when no server-approved `returnUrl` was supplied.
 
 Flutter/Android work to complete:
 
-1. Register an Android `VIEW` intent filter for scheme `lidapay` and host
-   `redirect-url` on the Flutter `MainActivity`, with `DEFAULT` and `BROWSABLE`.
-   Keep it scoped to the payment callback; do not add an unrestricted URL
-   handler.
+1. Register an Android `VIEW` intent filter on the Flutter `MainActivity` with
+   `DEFAULT` and `BROWSABLE` for the payment callback (`scheme="lidapay"`,
+   `host="redirect-url"`) and a separate scoped intent filter for password-reset
+   completion (`scheme="lidapay"`, `host="auth"`,
+   `path="/password-reset-complete"`). Keep each route explicitly scoped; do not
+   add an unrestricted URL handler.
 2. Use a Flutter deep-link listener (for example, `app_links`) and handle both
    the initial URI when the process is cold-started and the URI stream when the
    app is already running or resumed. Configure this once near app startup.
-3. Route the URI to one payment-return handler. Parse only allowlisted keys
-   (`orderId`, `token`, `status`, `transactionId`, `timestamp`); never navigate
-   directly from arbitrary host/path values.
+3. Dispatch each allowlisted route strictly by host/path: route
+   `host == 'auth' && path == '/password-reset-complete'` to the Sign In screen
+   with a `"Password updated"` banner (never into the payment handler), and
+   route `host == 'redirect-url'` to the payment-return handler. Parse only
+   allowlisted payment keys (`orderId`, `token`, `status`, `transactionId`,
+   `timestamp`); never navigate directly from arbitrary host/path values.
 4. Match the callback to a locally saved pending payment. If the callback's
    reference does not match a pending payment, do not query/display another
    user's or unrelated transaction. Avoid logging the `token` or full URI.
@@ -914,15 +1019,19 @@ events. A decision link must fetch the authenticated decision first, gracefully
 handle already-resolved/expired decisions, and avoid showing a stale choice UI.
 Persist a pending inbound URI until login is complete, then route it once.
 
-Do not combine payment callback parsing and FCM payload parsing into one
-unvalidated navigation path. They have different trust boundaries: payment
-returns must query payment/order state; decision pushes must fetch the decision
-and top-up status.
+Do not combine auth deep-link routing, payment callback parsing, and FCM payload
+parsing into one unvalidated navigation path. They have different trust
+boundaries: `lidapay://auth/password-reset-complete` opens the Sign In view
+with a confirmation message (and carries no credentials); payment returns must
+query payment/order state; decision pushes must fetch the decision and top-up
+status.
 
 Production release checks: verify the Play signing SHA-256 fingerprint against
 the backend Digital Asset Links document, verify Android `assetlinks.json`
 fetches successfully without redirects, and test the installed Play-signed
-build (not only debug) for app-link verification and cold-start routing.
+build (not only debug) for app-link verification, password-reset return
+(`lidapay://auth/password-reset-complete`), payment return, and cold-start
+routing.
 
 ## 8. Shop catalogue, cart, checkout, and orders
 
@@ -1007,14 +1116,14 @@ are also possible. Tracking is a backend timeline; do not fabricate courier
 updates. Public order-number lookup may expose shipping details, so prefer
 authenticated order detail and do not expose order numbers unnecessarily.
 
-**Courier pricing & Order Tracking UI:** the backend-calculated kilometer
-distance is for Frank's pricing calculation, not a fee. The current courier API does not
-include a quote-submit endpoint, so a Frank quote will not automatically update
-checkout or `deliveryFee`. The server applies `DELIVERY_FEE_GHS` (default GHS
-0); do not calculate or send a delivery fee from the app, or imply that zero
-is a confirmed courier quote. Customer destination GPS is optional and must
-only be requested when the delivery flow requires it; keep a manual address
-path for users who decline.
+**Courier pricing & Order Tracking UI:** LidaPay calculates the delivery fee
+at checkout from a server-side rate card (`DELIVERY_RATE_CARD` in `.env`)
+based on `deliveryDistance.km`. The customer sees the final fee in
+`order.total` before paying — the app does **not** send or calculate a
+delivery fee. Frank reads the charged `deliveryFee` and `deliveryDistance.km`
+from the courier job payload; Frank does **not** submit a quote back to LidaPay.
+Customer destination GPS is optional and must only be requested when the
+delivery flow requires it; keep a manual address path for users who decline.
 
 On the **Track Order** screen, the mobile app is strictly read-only (`GET /api/v1/shop/orders/{order._id}/tracking` with the customer's `Bearer` JWT; never embed courier partner credentials in the app) and must implement four updates:
 
@@ -1266,11 +1375,15 @@ Before release, QA should cover:
 
 - OTP login, refresh, expired session, logout, account switch, and secure token
   cleanup.
+- Hosted `/reset-password` form UX (Show/Hide toggles, above-input live
+  requirements) and post-reset return (`lidapay://auth/password-reset-complete`
+  opening the mobile Sign In screen, plus `?passwordReset=complete` returning to
+  LidaPay Web).
 - Ghana network selection and bundle discovery; Ghana airtime/data delivery.
 - Reloadly country/operator lookup and airtime/data purchase for at least two
   non-Ghana destinations.
-- SEND to registered recipient: pending receipt, recipient push, both choices,
-  resolved push, timeout/default resolution, and status recovery after app kill.
+- SEND to registered recipient (testing both `0...` local and `+233` / `233` / international formats): pending receipt, recipient push, both choices, resolved push, timeout/default resolution, and in-app recovery via `GET /api/v1/recipient-decisions/pending` after app kill or with OS notifications disabled.
+- FCM token registration & per-install `deviceId`: confirm `POST /api/v1/notifications/device-token` (or auth endpoints with `deviceToken`) registers an active token (`GET /api/v1/notifications/device-token` returns `total >= 1`), two users on identical phone models/emulators do NOT share `Build.DEVICE` or deactivate each other, and `onTokenRefresh` updates cleanly.
 - USE from Lida Value to self: direct purchase, wallet debit, refreshed balance,
   and no recipient-choice pending state.
 - Advansis Pay success, decline/failure, delayed result, cancelled checkout,

@@ -156,12 +156,25 @@ class PushNotificationService {
   }
 
   /// Registers the device token with the backend under the active session.
+  /// If `getToken()` returned null during early boot, retries fetching it
+  /// before bailing out so slow Play Services init still registers on startup.
   Future<void> syncDeviceToken() async {
-    final token = _lastToken;
+    var token = _lastToken;
+    if ((token == null || token.isEmpty) && _firebaseAvailable) {
+      try {
+        // ignore: deprecated_member_use
+        token = await FirebaseMessaging.instance.getToken();
+        if (token != null && token.isNotEmpty) _lastToken = token;
+      } catch (_) {}
+    }
     if (token == null || token.isEmpty) return;
 
     try {
       final identity = _ref.read(deviceIdentityProvider);
+      if (identity.deviceId.isEmpty ||
+          identity.deviceId.toLowerCase() == 'unknown') {
+        return;
+      }
       final repo = _ref.read(notificationsRepositoryProvider);
       await repo.registerDeviceToken(
         token: token,

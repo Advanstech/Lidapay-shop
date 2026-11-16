@@ -12,6 +12,7 @@ import 'core/providers/theme_provider.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/providers.dart';
+import 'features/recipient_choice/providers.dart';
 
 /// App-wide scroll behavior that gives both Android and iOS a smooth,
 /// elastic, native feel (and allows mouse/trackpad drag in Chrome DevTools).
@@ -95,6 +96,10 @@ class _LidapayAppState extends ConsumerState<LidapayApp>
     if (state == AppLifecycleState.resumed) {
       _applyEdgeToEdge();
       unawaited(ref.read(authSessionProvider.notifier).refreshProfile());
+      if (ref.read(hasSessionProvider)) {
+        unawaited(ref.read(pushNotificationServiceProvider).syncDeviceToken());
+        unawaited(ref.read(pendingRecipientDecisionsProvider.notifier).refresh());
+      }
     }
   }
 

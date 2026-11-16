@@ -128,6 +128,8 @@ class ApiEndpoints {
   static const String deviceToken = '/api/v1/notifications/device-token';
 
   static const String recipientEligibility = '/api/v1/recipient/eligibility';
+  static const String recipientDecisionsPending =
+      '/api/v1/recipient-decisions/pending';
   static String recipientDecision(String decisionId) =>
       '/api/v1/recipient-decisions/$decisionId';
   static String recipientDecisionRespond(String decisionId) =>

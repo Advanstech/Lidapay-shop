@@ -260,15 +260,23 @@ class CheckoutSuccessScreen extends ConsumerWidget {
                   ),
                   onPressed: () {
                     HapticFeedback.lightImpact();
-                    Navigator.of(context).pop();
-                    context.pushReplacement(AppRoutes.orders);
+                    if (context.canPop()) {
+                      Navigator.of(context).pop();
+                      context.pushReplacement(AppRoutes.orders);
+                    } else {
+                      context.go(AppRoutes.orders);
+                    }
                   },
                 ),
                 const SizedBox(height: 12),
                 OutlinedButton(
                   onPressed: () {
-                    Navigator.of(context).pop();
-                    if (context.canPop()) context.pop();
+                    if (context.canPop()) {
+                      Navigator.of(context).pop();
+                      if (context.canPop()) context.pop();
+                    } else {
+                      context.go(AppRoutes.shop);
+                    }
                   },
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 14),

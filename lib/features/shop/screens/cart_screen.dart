@@ -11,7 +11,6 @@ import '../../../core/widgets/product_image.dart';
 import '../../../core/widgets/skeleton.dart';
 import '../../../core/widgets/surface_card.dart';
 import '../../auth/providers.dart';
-import '../../payments/data/payment_models.dart';
 import '../../payments/data/pending_payment.dart';
 import '../../payments/providers.dart';
 import '../../payments/widgets/payment_awaiting_panel.dart';
@@ -56,10 +55,10 @@ class _CartScreenState extends ConsumerState<CartScreen>
   }
 
 
-  /// Contract order: collect the complete postal delivery address (required
-  /// at checkout — the profile cannot supply it), pick the live ExpressPay
-  /// rail, then create the order and pay `order.total`. GTPay debitwallet
-  /// stays hidden until GTBank finishes production onboarding.
+  /// Contract order: collect the postal delivery address (with optional map pin),
+  /// create the order via `POST /api/v1/shop/checkout` so the backend calculates
+  /// `deliveryFee` from its rate card, show the final `order.total` to the
+  /// customer, and then launch ExpressPay (`card`).
   Future<void> _checkout() async {
     final user = ref.read(authSessionProvider)?.user;
     final cartData = ref.read(cartProvider).valueOrNull;
@@ -72,26 +71,10 @@ class _CartScreenState extends ConsumerState<CartScreen>
     );
     if (!mounted || address == null) return;
 
-    final choice = await showPaymentMethodSheet(
-      context: context,
-      amountLabel: Formatters.currency(cartData.total),
-      orderSummary:
-          'Shop order · ${cartData.itemCount} '
-          '${cartData.itemCount == 1 ? 'item' : 'items'}',
-      registeredNumber: user?.contactPhone ?? '',
-      showMobileMoney: false,
-    );
-    if (!mounted || choice == null) return;
-
     setState(() => _checkingOut = true);
     final order = await ref
         .read(cartProvider.notifier)
-        .checkout(
-          address,
-          paymentMethod: choice.method == PaymentMethod.card
-              ? 'card'
-              : 'momo',
-        );
+        .checkout(address, paymentMethod: 'card');
     if (!mounted) return;
     setState(() => _checkingOut = false);
 
@@ -106,6 +89,33 @@ class _CartScreenState extends ConsumerState<CartScreen>
     _pendingOrder = order;
     _pendingAddress = address;
     ref.read(lastOrderProvider.notifier).state = order;
+
+    final fee = order.deliveryFee ?? 0;
+    final summaryParts = <String>[
+      'Order ${order.reference}',
+      '${cartData.itemCount} ${cartData.itemCount == 1 ? 'item' : 'items'}',
+      if (fee > 0) 'Delivery ${Formatters.currency(fee)}',
+    ];
+    final choice = await showPaymentMethodSheet(
+      context: context,
+      amountLabel: Formatters.currency(order.total),
+      orderSummary: summaryParts.join(' · '),
+      registeredNumber: user?.contactPhone ?? '',
+      showMobileMoney: false,
+    );
+    if (!mounted || choice == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Order ${order.reference} was placed — complete payment from My Orders.',
+            ),
+          ),
+        );
+      }
+      return;
+    }
+
     final launched = await ref
         .read(paymentSessionProvider.notifier)
         .beginPayment(
@@ -141,6 +151,12 @@ class _CartScreenState extends ConsumerState<CartScreen>
 
     ref.listen<PaymentSessionState>(paymentSessionProvider, (prev, next) {
       if (!mounted) return;
+      if (!(ModalRoute.of(context)?.isCurrent ?? true)) {
+        if (next.phase == PaymentPhase.completed) {
+          ref.invalidate(userOrdersProvider);
+        }
+        return;
+      }
       if (next.phase == PaymentPhase.completed &&
           next.shopOrderNumber != null) {
         final order = _pendingOrder ??

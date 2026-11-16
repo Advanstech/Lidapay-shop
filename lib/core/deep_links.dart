@@ -39,11 +39,11 @@ class PaymentDeepLinkHandler {
     // Password links need no session — the emailed token is the
     // authority, and the reset flow exists precisely for signed-out
     // users. Route them immediately, never park them.
-    if (_isPasswordLink(uri)) {
+    if (isPasswordLink(uri)) {
       _routePasswordLink(uri);
       return;
     }
-    if (!_isPaymentReturn(uri)) return;
+    if (!isPaymentReturn(uri)) return;
     if (!_hasSession()) {
       _parked = uri;
       return;
@@ -63,7 +63,7 @@ class PaymentDeepLinkHandler {
   /// The backend fallback is `lidapay://redirect-url?…`; newer builds emit
   /// `lidapay://payments/callback?…` and the shop handoff mentions
   /// `lidapay://shop/checkout/callback`. All three are payment returns.
-  static bool _isPaymentReturn(Uri uri) {
+  static bool isPaymentReturn(Uri uri) {
     if (uri.scheme != 'lidapay') return false;
     final host = uri.host;
     final path = uri.path;
@@ -81,7 +81,7 @@ class PaymentDeepLinkHandler {
   /// only confirms the password was already changed on the web page.
   /// The backend may also emit plain https APP_URL links — those arrive
   /// through go_router directly, not this stream.
-  static bool _isPasswordLink(Uri uri) {
+  static bool isPasswordLink(Uri uri) {
     if (uri.scheme != 'lidapay') return false;
     final host = uri.host;
     final path = uri.path;
@@ -92,15 +92,12 @@ class PaymentDeepLinkHandler {
         path.contains('verify-password-change');
   }
 
-  void _routePasswordLink(Uri uri) {
+  static String passwordRouteFor(Uri uri) {
     if (uri.path.contains('password-reset-complete')) {
-      _router.go(
-        Uri(
-          path: AppRoutes.login,
-          queryParameters: const {'passwordReset': '1'},
-        ).toString(),
-      );
-      return;
+      return Uri(
+        path: AppRoutes.login,
+        queryParameters: const {'passwordReset': '1'},
+      ).toString();
     }
     final isReset =
         uri.host == 'reset-password' || uri.path.contains('reset-password');
@@ -108,37 +105,53 @@ class PaymentDeepLinkHandler {
         ? AppRoutes.resetPassword
         : AppRoutes.verifyPasswordChange;
     final token = uri.queryParameters['token'];
-    _router.push(
-      Uri(
-        path: route,
-        queryParameters: {
-          if (token != null && token.isNotEmpty) 'token': token,
-        },
-      ).toString(),
-    );
+    return Uri(
+      path: route,
+      queryParameters: {
+        if (token != null && token.isNotEmpty) 'token': token,
+      },
+    ).toString();
   }
 
-  void _routeToCallback(Uri uri) {
+  static String callbackRouteFor(Uri uri) {
     final params = uri.queryParameters;
     final orderId = params['orderId'] ?? params['order-id'];
     final token = params['token'];
     final status = params['status'];
     final errorMessage = params['errorMessage'] ?? params['error_message'];
 
-    _router.push(
-      Uri(
-        path: AppRoutes.paymentCallback,
-        queryParameters: {
-          if (status != null) 'status': status,
-          if (orderId != null && orderId.isNotEmpty) 'orderId': orderId,
-          // The callback token is never forwarded — the saved token is the
-          // verification authority; presence just unlocks verification.
-          if (token != null && token.isNotEmpty) 'hasToken': '1',
-          if (errorMessage != null && errorMessage.isNotEmpty)
-            'errorMessage': errorMessage,
-        },
-      ).toString(),
-    );
+    return Uri(
+      path: AppRoutes.paymentCallback,
+      queryParameters: {
+        if (status != null) 'status': status,
+        if (orderId != null && orderId.isNotEmpty) 'orderId': orderId,
+        // The callback token is never forwarded — the saved token is the
+        // verification authority; presence just unlocks verification.
+        if (token != null && token.isNotEmpty) 'hasToken': '1',
+        if (errorMessage != null && errorMessage.isNotEmpty)
+          'errorMessage': errorMessage,
+      },
+    ).toString();
+  }
+
+  void _routePasswordLink(Uri uri) {
+    final target = passwordRouteFor(uri);
+    if (uri.path.contains('password-reset-complete')) {
+      _router.go(target);
+      return;
+    }
+    _router.push(target);
+  }
+
+  void _routeToCallback(Uri uri) {
+    final target = callbackRouteFor(uri);
+    // Android can deliver the same deep link to both Flutter's RouteInformation
+    // (GoRouter) and AppLinks' stream. Avoid stacking a duplicate callback page.
+    final currentUri = _router.routerDelegate.currentConfiguration.uri;
+    if (currentUri.path == AppRoutes.paymentCallback) {
+      return;
+    }
+    _router.push(target);
   }
 
   void dispose() => _sub?.cancel();

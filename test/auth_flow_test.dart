@@ -8,7 +8,13 @@ import 'package:lidapay_app/core/deep_links.dart';
 import 'package:lidapay_app/core/router/app_router.dart';
 import 'package:lidapay_app/core/widgets/app_button.dart';
 import 'package:lidapay_app/features/auth/screens/login_screen.dart';
+import 'package:lidapay_app/features/dashboard/screens/dashboard_screen.dart';
 import 'package:lidapay_app/features/dashboard/widgets/transaction_tile.dart';
+import 'package:lidapay_app/features/payments/data/pending_payment.dart';
+import 'package:lidapay_app/features/payments/providers.dart';
+import 'package:lidapay_app/features/payments/screens/payment_return_screen.dart';
+import 'package:lidapay_app/features/services/widgets/service_receipt_screen.dart';
+import 'package:lidapay_app/features/splash/screens/splash_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'helpers/mock_app.dart';
@@ -333,6 +339,56 @@ void main() {
         find.text('Password updated. Sign in with your new password.'),
         findsOneWidget,
       );
+    },
+  );
+
+  testWidgets(
+    'lidapay://redirect-url routes directly to PaymentReturnScreen receipt instead of restarting at Splash',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({'onboarding_seen_v1': true});
+      await pumpMockApp(tester);
+      await tester.pumpAndSettle(const Duration(milliseconds: 100));
+
+      // Sign in via 6-digit OTP on LoginScreen.
+      await tester.enterText(find.byType(TextFormField).at(0), '0244588584');
+      await tester.pumpAndSettle(const Duration(milliseconds: 100));
+      await tester.tap(find.text('Continue'));
+      await tester.pumpAndSettle(const Duration(milliseconds: 100));
+      for (var i = 0; i < 6; i++) {
+        await tester.enterText(find.byKey(ValueKey('otp_box_$i')), '${i + 1}');
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      await tester.pumpAndSettle(const Duration(milliseconds: 100));
+      expect(find.byType(DashboardScreen), findsOneWidget);
+
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(DashboardScreen)),
+      );
+      await container.read(paymentSessionProvider.notifier).beginPayment(
+            PendingPayment.ghanaAirtime(
+              reference: 'LDP-TEST-1',
+              amount: 10,
+              recipientNumber: '0244588584',
+              networkId: '4',
+              saveToLidaValue: false,
+              isSelfTopup: false,
+              orderDesc: 'Test airtime',
+            ),
+          );
+
+      // Simulate Android delivering `lidapay://redirect-url?...` into GoRouter.
+      final router = container.read(routerProvider);
+      router.go('lidapay://redirect-url?orderId=ADV-1&token=saved-token&status=success');
+      await tester.pumpAndSettle(const Duration(milliseconds: 100));
+
+      expect(find.byType(SplashScreen), findsNothing);
+      expect(find.byType(PaymentReturnScreen), findsOneWidget);
+
+      // Wait for mock credit latency to settle onto the receipt.
+      await tester.pump(const Duration(seconds: 2));
+      await tester.pumpAndSettle(const Duration(milliseconds: 100));
+
+      expect(find.byType(ServiceReceiptScreen), findsOneWidget);
     },
   );
 }

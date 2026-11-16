@@ -1,12 +1,21 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/router/app_router.dart';
+import '../../../core/utils/formatters.dart';
+import '../../dashboard/providers.dart';
+import '../../history/providers.dart';
+import '../../recipient_choice/screens/pending_topup_screen.dart';
+import '../../services/data/service_models.dart';
+import '../../services/providers.dart';
 import '../../services/widgets/service_receipt_screen.dart';
 import '../../shop/data/shop_models.dart';
 import '../../shop/providers.dart';
 import '../../shop/screens/checkout_success_screen.dart';
+import '../data/pending_payment.dart';
 import '../providers.dart';
 import '../widgets/payment_awaiting_panel.dart';
 
@@ -34,9 +43,17 @@ class PaymentReturnScreen extends ConsumerStatefulWidget {
 }
 
 class _PaymentReturnScreenState extends ConsumerState<PaymentReturnScreen> {
+  ServiceReceipt? _resolvedReceipt;
+  PendingPayment? _resolvedPending;
+  ShopOrder? _resolvedOrder;
+  String? _resolvedShopOrderNumber;
+  String? _resolvedFailure;
+  bool _loadingShopOrder = false;
+
   @override
   void initState() {
     super.initState();
+    _resolvedPending = ref.read(paymentSessionProvider).pending;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref
           .read(paymentSessionProvider.notifier)
@@ -48,30 +65,131 @@ class _PaymentReturnScreenState extends ConsumerState<PaymentReturnScreen> {
     });
   }
 
+  void _invalidateFeeds() {
+    ref.invalidate(historyProvider);
+    ref.invalidate(historyAnalyticsProvider);
+    ref.invalidate(recentTransactionsProvider);
+    ref.invalidate(walletSummaryProvider);
+    ref.invalidate(lidaPointsProvider);
+    ref.invalidate(lidaValueProvider);
+    ref.invalidate(userOrdersProvider);
+  }
+
+  Future<void> _fetchShopOrder(
+    PaymentSessionState session,
+    PendingPayment? pending,
+  ) async {
+    if (_loadingShopOrder) return;
+    _loadingShopOrder = true;
+    final repo = ref.read(shopRepositoryProvider);
+    final orderId = pending?.params['orderId']?.toString();
+    final orderNumber = session.shopOrderNumber;
+    ShopOrder? fetched;
+    try {
+      if (orderId != null && orderId.isNotEmpty) {
+        fetched = await repo.getOrder(orderId);
+      }
+      if (fetched == null && orderNumber != null && orderNumber.isNotEmpty) {
+        fetched = await repo.getOrderByNumber(orderNumber);
+      }
+    } catch (_) {
+      // Fall back cleanly to cached/saved order fields below.
+    }
+    if (!mounted) return;
+    setState(() {
+      if (fetched != null) {
+        _resolvedOrder = fetched;
+      }
+      _loadingShopOrder = false;
+    });
+  }
+
+  void _finishToHome() {
+    ref.read(paymentSessionProvider.notifier).reset();
+    context.go(AppRoutes.home);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final session = ref.watch(paymentSessionProvider);
+    ref.listen<PaymentSessionState>(paymentSessionProvider, (prev, next) {
+      if (!mounted) return;
+      if (next.pending != null) {
+        _resolvedPending = next.pending;
+      }
+      if (next.phase == PaymentPhase.completed) {
+        _invalidateFeeds();
+        setState(() {
+          _resolvedReceipt ??= next.receipt;
+          _resolvedShopOrderNumber ??= next.shopOrderNumber;
+          if (next.receipt == null && _resolvedOrder == null) {
+            final lastOrder = ref.read(lastOrderProvider);
+            if (lastOrder != null &&
+                (next.shopOrderNumber == null ||
+                    lastOrder.reference == next.shopOrderNumber)) {
+              _resolvedOrder = lastOrder;
+            }
+          }
+        });
+        if (next.receipt == null) {
+          unawaited(_fetchShopOrder(next, _resolvedPending));
+        }
+      } else if (next.phase == PaymentPhase.failed) {
+        setState(() {
+          _resolvedFailure ??=
+              widget.errorMessage ??
+              next.message ??
+              'The payment could not be confirmed.';
+        });
+      }
+    });
 
-    // Delivery confirmed — show the real receipt. For shop payments the
-    // order list is the destination.
-    if (session.phase == PaymentPhase.completed) {
-      final receipt = session.receipt;
-      if (receipt != null) {
-        return ServiceReceiptScreen(
-          receipt: receipt,
-          icon: Icons.payments_rounded,
-          onDone: () => context.go(AppRoutes.home),
+    final session = ref.watch(paymentSessionProvider);
+    final receipt = _resolvedReceipt ?? session.receipt;
+    final pending = _resolvedPending ?? session.pending;
+    final shopOrderNumber =
+        _resolvedShopOrderNumber ?? session.shopOrderNumber;
+
+    // Delivery confirmed — show the real receipt.
+    if (receipt != null) {
+      if (receipt.pendingTopup case final pendingTopup?) {
+        final isData =
+            pending?.kind == PendingPaymentKind.ghanaData ||
+            pending?.kind == PendingPaymentKind.globalData;
+        final amount = pending?.payAmount ?? 0;
+        final currency = pending?.payCurrency ?? 'GHS';
+        return PendingTopupScreen(
+          pending: pendingTopup,
+          amountLabel: currency == 'GHS'
+              ? Formatters.currency(amount)
+              : '$currency ${amount.toStringAsFixed(2)}',
+          recipientLabel:
+              pending?.params['recipientNumber']?.toString() ?? '',
+          serviceLabel: isData ? 'data bundle' : 'airtime',
+          icon: isData ? Icons.wifi_rounded : Icons.call_rounded,
+          onDone: _finishToHome,
         );
       }
-      final lastOrder = ref.watch(lastOrderProvider);
+      return ServiceReceiptScreen(
+        receipt: receipt,
+        icon: Icons.payments_rounded,
+        onDone: _finishToHome,
+      );
+    }
+
+    if (session.phase == PaymentPhase.completed ||
+        shopOrderNumber != null ||
+        _resolvedOrder != null) {
       final order =
-          lastOrder ??
+          _resolvedOrder ??
+          ref.watch(lastOrderProvider) ??
           ShopOrder(
-            id: session.shopOrderNumber ?? 'order',
-            reference: session.shopOrderNumber ?? 'ORD',
+            id: pending?.params['orderId']?.toString() ??
+                shopOrderNumber ??
+                'order',
+            reference: shopOrderNumber ?? 'ORD',
             itemCount: 1,
-            total: session.pending?.payAmount ?? 0,
-            currency: session.pending?.payCurrency ?? 'GHS',
+            total: pending?.payAmount ?? 0,
+            currency: pending?.payCurrency ?? 'GHS',
             placedAt: DateTime.now(),
             paymentStatus: 'paid',
             status: 'processing',
@@ -79,17 +197,27 @@ class _PaymentReturnScreenState extends ConsumerState<PaymentReturnScreen> {
       return CheckoutSuccessScreen(order: order);
     }
 
-    if (session.phase == PaymentPhase.failed) {
+    final failureMessage =
+        _resolvedFailure ??
+        (session.phase == PaymentPhase.failed
+            ? (widget.errorMessage ??
+                  session.message ??
+                  'The payment could not be confirmed.')
+            : null);
+    if (failureMessage != null) {
       return _OutcomeScaffold(
         success: false,
         title: 'Payment not completed',
-        message:
-            widget.errorMessage ??
-            session.message ??
-            'The payment could not be confirmed.',
+        message: failureMessage,
         actionLabel: 'Back',
-        onAction: () =>
-            context.canPop() ? context.pop() : context.go(AppRoutes.home),
+        onAction: () {
+          ref.read(paymentSessionProvider.notifier).reset();
+          if (context.canPop()) {
+            context.pop();
+          } else {
+            context.go(AppRoutes.home);
+          }
+        },
       );
     }
 

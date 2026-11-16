@@ -178,9 +178,8 @@ class ShippingAddress extends Equatable {
   final String postalCode;
   final String deliveryInstructions;
 
-  /// Customer delivery-pin coordinates. The backend requires both at
-  /// checkout and uses them with the branch pickup pin to compute the
-  /// courier distance — never send one without the other.
+  /// Optional customer delivery-pin coordinates. Never send one without the
+  /// other; when provided the backend computes courier distance from them.
   final double? latitude;
   final double? longitude;
 
@@ -198,7 +197,10 @@ class ShippingAddress extends Equatable {
     if (postalCode.isNotEmpty) 'postalCode': postalCode,
     if (deliveryInstructions.isNotEmpty)
       'deliveryInstructions': deliveryInstructions,
-    if (hasDeliveryPin) 'latitude': latitude, 'longitude': longitude,
+    if (hasDeliveryPin) ...{
+      'latitude': latitude,
+      'longitude': longitude,
+    },
   };
 
   /// The `shippingAddress` object persisted on an order/tracking payload.
@@ -312,6 +314,8 @@ class ShopOrder extends Equatable {
     this.subtotal,
     this.discount,
     this.deliveryFee,
+    this.deliveryDistanceKm,
+    this.deliveryDistanceSource,
     this.paymentMethod,
     this.deliveryUpdates = const [],
   });
@@ -334,6 +338,8 @@ class ShopOrder extends Equatable {
   final double? subtotal;
   final double? discount;
   final double? deliveryFee;
+  final double? deliveryDistanceKm;
+  final String? deliveryDistanceSource;
 
   /// `momo` | `card` | `wallet` as recorded at checkout.
   final String? paymentMethod;

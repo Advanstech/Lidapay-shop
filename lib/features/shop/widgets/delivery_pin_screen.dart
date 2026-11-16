@@ -251,8 +251,8 @@ class _DeliveryPinPickerScreenState
               ),
               const SizedBox(height: 4),
               Text(
-                'The delivery pin is required for courier distance. Use your '
-                'current location or enter the coordinates manually.',
+                'Drop a pin for accurate courier distance, or use your '
+                'current location / manual coordinates.',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: scheme.onSurfaceVariant,
                 ),

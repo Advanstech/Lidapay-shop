@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import '../constants/app_constants.dart';
+import '../device/device_identity.dart';
+import '../notifications/push_notification_service.dart';
 import 'api_endpoints.dart';
 import 'api_exception.dart';
 import 'token_store.dart';
@@ -12,9 +14,14 @@ import 'token_store.dart';
 /// bearer token and transparently refreshes it on 401 (single-flight:
 /// concurrent failures share one refresh) before retrying once.
 class ApiClient {
-  ApiClient({Dio? dio, Dio? refreshDio, required this.tokenStore})
-    : _dio = dio ?? _buildDio(),
-      _refreshDio = refreshDio ?? _buildDio() {
+  ApiClient({
+    Dio? dio,
+    Dio? refreshDio,
+    required this.tokenStore,
+    this.deviceIdentity,
+    this.deviceTokenProvider,
+  }) : _dio = dio ?? _buildDio(),
+       _refreshDio = refreshDio ?? _buildDio() {
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) {
@@ -108,6 +115,8 @@ class ApiClient {
   final Dio _dio;
   final Dio _refreshDio;
   final TokenStore tokenStore;
+  final DeviceIdentity? deviceIdentity;
+  final String? Function()? deviceTokenProvider;
 
   Future<String?>? _refreshing;
 
@@ -206,9 +215,23 @@ class ApiClient {
       return null;
     }
     try {
+      final fcm = deviceTokenProvider?.call();
+      final identity = deviceIdentity;
       final res = await _refreshDio.post<Map<String, dynamic>>(
         ApiEndpoints.refresh,
-        data: {'refreshToken': refreshToken},
+        data: {
+          'refreshToken': refreshToken,
+          if (fcm != null && fcm.isNotEmpty) 'deviceToken': fcm,
+          if (identity != null) ...{
+            'devicePlatform': identity.platform,
+            if (identity.deviceId.isNotEmpty &&
+                identity.deviceId.toLowerCase() != 'unknown')
+              'deviceId': identity.deviceId,
+            if (identity.appVersion.isNotEmpty)
+              'appVersion': identity.appVersion,
+            if (identity.locale.isNotEmpty) 'locale': identity.locale,
+          },
+        },
       );
       final data = res.data ?? const <String, dynamic>{};
       final access = (data['access_token'] ?? '').toString();
@@ -238,5 +261,10 @@ class ApiClient {
 }
 
 final apiClientProvider = Provider<ApiClient>((ref) {
-  return ApiClient(tokenStore: ref.watch(tokenStoreProvider));
+  return ApiClient(
+    tokenStore: ref.watch(tokenStoreProvider),
+    deviceIdentity: ref.watch(deviceIdentityProvider),
+    deviceTokenProvider: () =>
+        ref.read(pushNotificationServiceProvider).currentToken,
+  );
 });

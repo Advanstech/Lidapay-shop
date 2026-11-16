@@ -30,12 +30,13 @@ abstract class ShopRepository {
   Future<Cart> clearCart();
 
   /// POST /api/v1/shop/checkout — creates a pending order from the server
-  /// cart. The caller then settles it with Advansis Pay using the returned
-  /// `orderNumber` as `shopOrderNumber`.
+  /// cart and calculates the server-side `deliveryFee` and `total`.
+  /// The mobile client must not send a client-computed delivery fee.
   Future<ShopOrder> checkout({
     required ShippingAddress shippingAddress,
     String paymentMethod = 'momo',
     double deliveryFee = 0,
+    double? deliveryDistanceKm,
   });
 
   /// GET /api/v1/shop/orders — list current user's orders (paginated).

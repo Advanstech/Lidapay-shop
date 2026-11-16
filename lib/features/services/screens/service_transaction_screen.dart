@@ -1430,6 +1430,12 @@ class _EnhancedInternetDataWizardState
   Widget build(BuildContext context) {
     ref.listen<PaymentSessionState>(paymentSessionProvider, (prev, next) {
       if (!mounted) return;
+      // Leave session state intact when `PaymentReturnScreen` is presenting
+      // the outcome above this route.
+      if (!(ModalRoute.of(context)?.isCurrent ?? true)) {
+        if (next.phase == PaymentPhase.completed) _invalidateActivityFeeds();
+        return;
+      }
       if (next.phase == PaymentPhase.completed && next.receipt != null) {
         setState(() => _receipt = next.receipt);
         ref.read(paymentSessionProvider.notifier).reset();

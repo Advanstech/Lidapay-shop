@@ -49,7 +49,15 @@
                 <data android:scheme="lidapay" android:host="shop"/>
                 <data android:scheme="lidapay" android:host="reset-password"/>
                 <data android:scheme="lidapay" android:host="verify-password-change"/>
-                <data android:scheme="lidapay" android:host="auth"/>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data
+                    android:scheme="lidapay"
+                    android:host="auth"
+                    android:path="/password-reset-complete"/>
             </intent-filter>
         </activity>
         <!-- Google Maps key for the live courier driver pin. Value comes from

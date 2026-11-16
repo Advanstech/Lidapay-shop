@@ -1,8 +1,8 @@
-# Frank's Courier Integration — API Setup, Postman & Live Verification Guide
+# Frank's Courier Integration — API Setup, Postman & Verification Guide
 
 **For:** Frank and the courier engineering team  
 **From:** Advansis Technologies / LidaPay  
-**Date:** 5 November 2026  
+**Date:** 16 November 2026  
 **API base URL:** `https://api.advansistechnologies.com`  
 **Courier API prefix:** `/api/v1/courier`  
 **Currency:** GHS
@@ -15,13 +15,16 @@ The integration between **Frank's Courier System** and **LidaPay** is two-way an
 
 1. **Poll for Available Jobs (`GET /api/v1/courier/jobs?state=available`)**  
    Every ~30 seconds, Frank's server asks LidaPay for newly paid, unassigned orders.
+
 2. **Accept a Job (`POST /api/v1/courier/jobs/{orderNumber}/accept`)**  
    When Frank's system books an order internally, it calls LidaPay with its `bookingReference` and `trackingNumber` to claim the order atomically so no other courier can take it.
+
 3. **Send Status Updates (`POST /api/v1/courier/jobs/{orderNumber}/events`)**  
    As the parcel moves, Frank's server posts status milestones in order:
    - `picked_up` *(required first — marks the order as `shipped` in LidaPay)*
    - `out_for_delivery`
    - `delivered` *(or `delivery_exception` / `failed_delivery` if there is an issue)*
+
 4. **Stream Live Driver GPS (`POST /api/v1/courier/jobs/{orderNumber}/location`)**  
    While the order is `shipped` (after `picked_up` and before `delivered`), Frank's system sends the driver's `latitude` and `longitude` every 5–10 seconds. The LidaPay mobile app reads these coordinates from LidaPay to move the driver pin on the customer's Google Map.
 
@@ -29,11 +32,11 @@ The integration between **Frank's Courier System** and **LidaPay** is two-way an
 
 | Advansis Technologies / LidaPay API team | Frank's engineering team |
 |---|---|
-| Deploy the courier API to sandbox and production. | Build a courier client (and test in Postman/cURL) that polls available jobs and processes orders assigned to Frank. |
-| Generate a distinct partner ID/secret pair for each environment, configure it on the matching API deployment, and securely share it with Frank. | Store the shared credentials in Frank's server-side secret manager; never put the secret in a mobile app, browser, logs, or source control. |
+| Deploy the courier API to production. | Build a courier client (and test in Postman/cURL) that polls available jobs and processes orders assigned to Frank. |
+| Generate a distinct partner ID/secret pair for production, configure it on the matching API deployment, and securely share it with Frank. | Store the shared credentials in Frank's server-side secret manager; never put the secret in a mobile app, browser, logs, or source control. |
 | Provide Frank the API base URL and a paid test order for end-to-end testing. | Sign every request using the shared secret, send the required HTTP headers, and keep the server clock synchronized. |
 | Verify LidaPay receives accepted jobs, status events, and GPS updates; ensure customer tracking can read them. | Accept each job after booking it internally; report `picked_up` before `out_for_delivery`, send status updates, and send driver GPS during active deliveries. |
-| Rotate temporary test secrets and provision permanent credentials out-of-band after sign-off. | Complete tests, report issues, and switch to permanent production credentials once both teams approve go-live. |
+| Provision permanent credentials out-of-band after sign-off. | Complete tests, report issues, and switch to permanent production credentials once both teams approve go-live. |
 
 > **Note on Google Maps:** Google Maps does not locate the driver by itself. Frank's driver app captures the phone's GPS coordinates and sends them to LidaPay's `/location` endpoint. The LidaPay customer app then polls LidaPay (`GET /api/v1/shop/orders/{order._id}/tracking`) using its own Google Maps key to render the driver marker.
 
@@ -109,12 +112,8 @@ COURIER_PARTNER_SECRET=<64 hexadecimal characters: 32 random bytes>
 COURIER_CARRIER_NAME=Frank Courier
 ```
 
-- **Credential handling:** No reusable partner secret is included in this
-  document. Advansis must provide the current partner ID and secret out-of-band.
-  A temporary test secret was previously embedded here; if it was configured
-  on any environment, rotate it before sharing credentials or enabling traffic.
-- **Masked Partner ID (`frank-****`):**  
-  Throughout this document, the partner ID is shown masked as `frank-****`. Replace `frank-****` in Postman or `curl` with the exact unmasked `COURIER_PARTNER_ID` shared with you by Advansis.
+- **Credential handling:** No reusable partner secret is included in this document. Advansis must provide the current partner ID and secret out-of-band. Rotate any temporary test credentials before enabling traffic.
+- **Masked Partner ID (`frank-****`):** Throughout this document, the partner ID is shown masked as `frank-****`. Replace `frank-****` in Postman or `curl` with the exact unmasked `COURIER_PARTNER_ID` shared with you by Advansis.
 
 ---
 
@@ -198,22 +197,7 @@ console.log("X-Signature:", signature);
 
 ## 4. API Request and Response Walkthrough
 
-The requests below document the contract. Fixed timestamps, signatures, IDs,
-and order data are historical examples; do not reuse them. The current local
-isolated HTTP end-to-end test exercises poll, accept, pickup, driver location,
-delivery, retry deduplication, and invalid authentication using in-memory test
-data. It does **not** certify the current production deployment. A live
-sandbox walkthrough requires credentials provisioned out-of-band and an
-isolated paid test order.
-
-> **Production verification gate (12 November 2026):** Signed polls to the
-> documented API returned `200` for both `available` and `assigned`. The
-> sampled live jobs did not include `pickupAddress`, customer destination
-> latitude/longitude, or `deliveryDistance`, so they do not meet the
-> branch-level job contract described below and must not be dispatched using
-> this handoff. Deploy/verify the branch-level backend and create a dedicated
-> paid test order with a configured shop branch and customer map pin before
-> completing live sign-off. Do not accept an existing customer order as a test.
+The requests below document the contract. Fixed timestamps, signatures, IDs, and order data are examples; do not reuse them.
 
 You can test these either in **Postman** (using the Pre-request Script above) or directly in your **terminal with `curl`**.
 
@@ -221,8 +205,7 @@ You can test these either in **Postman** (using the Pre-request Script above) or
 
 ### Quick Terminal Test (Copy & Paste into Terminal)
 
-To test a configured environment, load `COURIER_PARTNER_ID` and
-`COURIER_PARTNER_SECRET` securely, then run this block:
+To test a configured environment, load `COURIER_PARTNER_ID` and `COURIER_PARTNER_SECRET` securely, then run this block:
 
 ```bash
 export COURIER_API_BASE="https://api.advansistechnologies.com"
@@ -254,33 +237,8 @@ Frank's system polls this endpoint (e.g., every 30 seconds) to fetch up to 100 p
 - **Method:** `GET`
 - **URL:** `{{baseUrl}}/api/v1/courier/jobs?state=available`
 - **Body tab:** `none`
-- **Historical header example (expired; generate current values with the script):**
 
-| Header Key | Header Value |
-|---|---|
-| `X-Partner-Id` | `frank-****` *(unmasked ID sent in live test)* |
-| `X-Timestamp` | `1793879551` |
-| `X-Event-Id` | `frank-poll-test-0001` |
-| `X-Signature` | `ef3c0d076812f4317366e249c1a99ae4628ae694e9a4c882fd05ffae2b82cc84` |
-
-*(Exact 5-line canonical string that produced `ef3c0d076812f431...` with secret `78128ce1...`):*
-```text
-1793879551
-frank-poll-test-0001
-GET
-/api/v1/courier/jobs?state=available
-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-```
-
-#### Historical response example (`HTTP/2 200`; not a current deployment check):
-```http
-HTTP/2 200 
-content-type: application/json; charset=utf-8
-
-{"jobs":[]}
-```
-
-When paid, unassigned orders are waiting in the queue, `"jobs"` contains:
+#### Response example (`HTTP/2 200`):
 ```json
 {
   "jobs": [
@@ -290,21 +248,7 @@ When paid, unassigned orders are waiting in the queue, `"jobs"` contains:
       "status": "paid",
       "currency": "GHS",
       "total": 158.58,
-      "deliveryFee": 0,
-      "pickupAddress": {
-        "branchId": "66f000000000000000000010",
-        "branchName": "East Legon Branch",
-        "partnerName": "Melcom Ghana",
-        "contactName": "Branch contact (when configured)",
-        "phone": "Branch phone (when configured)",
-        "email": "Branch email (when configured)",
-        "addressLine1": "JRRQ+V32, Near Sel Filling Station, Mensah Wood Ave",
-        "city": "Accra",
-        "region": "Greater Accra",
-        "country": "Ghana",
-        "latitude": 5.6413169,
-        "longitude": -0.164472
-      },
+      "deliveryFee": 5,
       "shippingAddress": {
         "fullName": "Kofi Mensah",
         "phone": "0241120481",
@@ -322,7 +266,7 @@ When paid, unassigned orders are waiting in the queue, `"jobs"` contains:
         "km": 8.6,
         "durationMinutes": 24,
         "computedAt": "2026-11-05T11:50:00.000Z",
-        "source": "server"
+        "source": "client"
       },
       "items": [
         {
@@ -340,14 +284,9 @@ When paid, unassigned orders are waiting in the queue, `"jobs"` contains:
 }
 ```
 
-The Melcom pickup values are provisional, transcribed from the supplied
-Google Maps screenshot; the coordinate may be the map camera center rather
-than the exact entrance. Do not treat this sample as a live job until the
-branch has been persisted and a dedicated post-deployment test order is polled.
 - **What to do next:** Copy `orderNumber` (e.g. `LPS261105000001`) into your Postman `orderNumber` variable for Steps 2–6.
-- **Note on fields:** `sku` is the Melcom product code to help identify the goods (may be absent on older items; do not invent one). `description` is the catalog snapshot description.
-- **Delivery pricing fields:** `pickupAddress` identifies the partner shop branch fulfilling this order (for example, Melcom East Legon), not the LidaPay/Advansis office; `shippingAddress` is the customer's destination, with required `latitude`/`longitude`. LidaPay resolves the branch from the products in the order. `deliveryDistance.km` is the server-calculated driving distance from that branch to the destination, with `durationMinutes` when available; `source` is `server`. These private pickup details are included only in the authenticated courier job response, not customer-facing order or product responses. Each order is fulfilled by one branch; mixed-branch carts are rejected at checkout and must be submitted as separate orders.
-- **Quote response limitation:** Frank can use these fields to calculate its delivery price, but the current API has no endpoint for posting a quote back to LidaPay and does not update `deliveryFee` from a Frank quote. Existing accept, event, and location endpoints are unchanged. Any quote returned to the customer must use an already-agreed channel; automatically showing or charging that quote requires a separately agreed API change.
+- **Note on fields:** `sku` is the product code to help identify the goods (may be absent on older items; do not invent one). `description` is the catalog snapshot description.
+- **Delivery pricing:** LidaPay calculates the delivery fee at checkout using a rate card based on `deliveryDistance.km`. Frank does **not** submit a quote back to LidaPay — the fee is already set on the order when the job appears in `/jobs`. Read `deliveryDistance.km` to verify the distance, and read `deliveryFee` to see the fee LidaPay charged the customer. `deliveryDistance` may be absent on older orders or when the customer did not share a location — fall back to your own distance estimate in that case, but note the charged `deliveryFee` may not match your estimate.
 
 ---
 
@@ -357,15 +296,6 @@ At any time, Frank's system can query all active (non-delivered, non-cancelled) 
 
 - **Method:** `GET`
 - **URL:** `{{baseUrl}}/api/v1/courier/jobs?state=assigned`
-- **Historical header example (expired; generate current values with the script):**
-  - `X-Partner-Id: frank-****`
-  - `X-Timestamp: 1793879584`
-  - `X-Event-Id: frank-poll-assigned-0001`
-  - `X-Signature: 83123d6d0dadbbe6af2247155e27227ca9326f0296ea95871001a00585263853`
-- **Historical response example (`HTTP/2 200`; not a current deployment check):**
-  ```json
-  {"jobs":[]}
-  ```
 
 ---
 
@@ -382,30 +312,7 @@ Once Frank's system creates an internal booking for a paid order, call `/accept`
 ```
 *(Note: `bookingReference` is required; `trackingNumber` and `estimatedDeliveryDate` are optional.)*
 
-- **Historical header example (expired; generate current values with the script):**
-
-| Header Key | Header Value |
-|---|---|
-| `Content-Type` | `application/json` |
-| `X-Partner-Id` | `frank-****` |
-| `X-Timestamp` | `1793879683` |
-| `X-Event-Id` | `frank-accept-test-0001` |
-| `X-Signature` | `8bae8a40887a41041b8df6f62f85a352317b3a7474e1d217262f2002f2c2014e` |
-
-*(Exact 5-line canonical string that produced `8bae8a40887a4104...` — note line 5 is the SHA-256 of the raw JSON body above):*
-```text
-1793879683
-frank-accept-test-0001
-POST
-/api/v1/courier/jobs/LPS261105000001/accept
-498b5a01abc9f5829de30468ec5a2bb49e302a135a0c248751e210fe259a1751
-```
-
-#### Historical response example:
-- A previous smoke test used a placeholder order number (`LPS261105000001`) that did not exist in the DB; signature authentication passed and the service returned:
-  ```json
-  {"statusCode":404,"timestamp":"2026-11-05T11:55:07.377Z","path":"/api/v1/courier/jobs/LPS261105000001/accept","method":"POST","message":"Order not found"}
-  ```
+#### Expected Response:
 - When called with an available `orderNumber` from Step 1, it returns (`201 Created`):
   ```json
   {
@@ -429,25 +336,6 @@ POST
 {"status":"picked_up","occurredAt":"2026-11-05T12:00:00.000Z","message":"Parcel picked up from Melcom warehouse","location":"Spintex Road, Accra","trackingNumber":"FRANK-TEST-TRACK-001"}
 ```
 *(Tip: When testing live in Postman with the Pre-request Script from Section 3, you can write `"occurredAt":"{{nowIso}}"` so Postman fills in the current ISO timestamp automatically!)*
-
-- **Headers tab:** auto-populated with fresh values by the Pre-request Script.
-
-| Header Key | Header Value |
-|---|---|
-| `Content-Type` | `application/json` |
-| `X-Partner-Id` | `frank-****` |
-| `X-Timestamp` | `1793879740` |
-| `X-Event-Id` | `frank-event-test-0001` |
-| `X-Signature` | `7f168548d8998e5b48282702caee71d348f220863e7b054c5cc0d51472d921d3` |
-
-*(Canonical string for that signature:)*
-```text
-1793879740
-frank-event-test-0001
-POST
-/api/v1/courier/jobs/LPS261105000001/events
-327d50f4e252bbbd7cbf76f080cd6b7a8bce2292dfe560ecde9107c98a494809
-```
 
 #### Expected Response:
 ```json
@@ -474,16 +362,6 @@ Supported status values for `/events` are:
 {"status":"out_for_delivery","occurredAt":"2026-11-05T12:15:00.000Z","message":"Driver is on the way to the recipient","location":"Osu, Accra","trackingNumber":"FRANK-TEST-TRACK-001","estimatedDeliveryDate":"2026-11-05T14:00:00.000Z"}
 ```
 
-- **Headers tab:** auto-populated with fresh values by the Pre-request Script.
-
-| Header Key | Header Value |
-|---|---|
-| `Content-Type` | `application/json` |
-| `X-Partner-Id` | `frank-****` |
-| `X-Timestamp` | `1793879800` |
-| `X-Event-Id` | `frank-event-test-0002` |
-| `X-Signature` | `5254d4ce1cb2d03b730d79a7e7805aa87a7cfb4ad4fb852baced8b63cec1f46c` |
-
 #### Expected Response:
 ```json
 {
@@ -508,16 +386,6 @@ While the order is in `shipped` status (after `picked_up` and before `delivered`
 {"latitude":5.6037,"longitude":-0.187,"recordedAt":"2026-11-05T12:15:05.000Z"}
 ```
 *(Latitude must be `-90` to `90`; longitude `-180` to `180`; `recordedAt` is an ISO-8601 timestamp not more than 1 minute in the future.)*
-
-- **Headers tab:** auto-populated with fresh values by the Pre-request Script.
-
-| Header Key | Header Value |
-|---|---|
-| `Content-Type` | `application/json` |
-| `X-Partner-Id` | `frank-****` |
-| `X-Timestamp` | `1793879820` |
-| `X-Event-Id` | `frank-gps-test-0001` |
-| `X-Signature` | `a4c9fff7de668a66e3fa5e93b6699079bf69deb35f4e8fa76e379afb19aafb75` |
 
 #### Expected Response:
 ```json
@@ -758,7 +626,7 @@ Response returned to the customer's app:
 
 Before switching to permanent production credentials, both teams should confirm:
 
-1. Temporary test secret (`78128ce1...`) is rotated and replaced with a unique permanent 64-hex `COURIER_PARTNER_SECRET` shared securely out-of-band.
+1. Permanent partner ID and 64-hex `COURIER_PARTNER_SECRET` are shared securely out-of-band and configured on the matching API environment.
 2. Signed job polling (`available` & `assigned`), job acceptance, status events (`picked_up` -> `out_for_delivery` -> `delivered`), idempotent retries, and live GPS updates have been verified end-to-end.
 3. Service coverage, pickup procedures, delivery pricing, SLA, exception statuses, support contacts, and proof-of-delivery procedures are agreed.
 4. Frank's driver app captures and transmits GPS coordinates every 5–10 seconds only during active (`shipped`) deliveries.

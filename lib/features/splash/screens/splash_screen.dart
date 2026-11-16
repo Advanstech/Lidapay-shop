@@ -41,6 +41,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       await notifier.restore();
     }
     if (!mounted) return;
+    // Do not clobber a deep link (e.g. a cold-start payment callback or
+    // password-reset return) that flushed onto the router while restoring.
+    final currentPath = GoRouter.of(
+      context,
+    ).routerDelegate.currentConfiguration.uri.path;
+    if (currentPath != AppRoutes.splash) return;
     final hasSession = ref.read(authSessionProvider) != null;
     if (hasSession) {
       context.go(AppRoutes.home);

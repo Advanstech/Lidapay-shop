@@ -31,6 +31,9 @@ class _CustomTestNotificationsRepo implements NotificationsRepository {
 
   @override
   Future<void> unregisterDeviceToken({required String token}) async {}
+
+  @override
+  Future<int> getActiveDeviceTokenCount() async => 1;
 }
 
 void main() {

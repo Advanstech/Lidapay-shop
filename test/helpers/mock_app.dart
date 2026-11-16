@@ -13,6 +13,9 @@ import 'package:lidapay_app/features/notifications/providers.dart';
 import 'package:lidapay_app/features/payments/data/payment_models.dart';
 import 'package:lidapay_app/features/payments/data/payments_repository.dart';
 import 'package:lidapay_app/features/payments/providers.dart';
+import 'package:lidapay_app/features/recipient_choice/data/recipient_choice_repository.dart';
+import 'package:lidapay_app/features/recipient_choice/data/recipient_models.dart';
+import 'package:lidapay_app/features/recipient_choice/providers.dart';
 import 'package:lidapay_app/features/services/data/mock_services_repository.dart';
 import 'package:lidapay_app/features/services/data/services_repository.dart';
 import 'package:lidapay_app/features/services/providers.dart';
@@ -77,6 +80,45 @@ class FakePaymentsRepository implements PaymentsRepository {
       GtPayResult(status: 'COMPLETED', partnerTransId: partnerTransId);
 }
 
+class FakeRecipientChoiceRepository implements RecipientChoiceRepository {
+  @override
+  Future<RecipientEligibility> checkEligibility({
+    required String recipientPhone,
+    required String serviceType,
+    String? countryIsoCode,
+  }) async => const RecipientEligibility.unregistered();
+
+  @override
+  Future<List<RecipientDecision>> getPendingDecisions() async => const [];
+
+  @override
+  Future<RecipientDecision> getDecision(String decisionId) async =>
+      RecipientDecision(
+        decisionId: decisionId,
+        topupOrderId: 'TRX-MOCK',
+        status: DecisionStatus.pending,
+      );
+
+  @override
+  Future<RecipientDecision> respondToDecision({
+    required String decisionId,
+    required RecipientChoice choice,
+    required String idempotencyKey,
+  }) async => RecipientDecision(
+    decisionId: decisionId,
+    topupOrderId: 'TRX-MOCK',
+    status: DecisionStatus.resolved,
+    selectedChoice: choice,
+  );
+
+  @override
+  Future<TopupOrderStatus> getTopupStatus(String topupOrderId) async =>
+      TopupOrderStatus(
+        topupOrderId: topupOrderId,
+        state: TopupState.deliveredDirect,
+      );
+}
+
 /// Pumps the full app backed by the mock repositories. Call
 /// `SharedPreferences.setMockInitialValues` first — production wiring hits
 /// the live API, which tests must never touch.
@@ -106,6 +148,9 @@ Future<void> pumpMockApp(
         shopRepositoryProvider.overrideWithValue(MockShopRepository()),
         paymentsRepositoryProvider.overrideWithValue(
           FakePaymentsRepository(),
+        ),
+        recipientChoiceRepositoryProvider.overrideWithValue(
+          FakeRecipientChoiceRepository(),
         ),
         checkoutLauncherProvider.overrideWithValue((_) async => true),
       ],

@@ -43,6 +43,25 @@ class RemoteRecipientChoiceRepository implements RecipientChoiceRepository {
   }
 
   @override
+  Future<List<RecipientDecision>> getPendingDecisions() async {
+    final raw = await _api.getRaw(ApiEndpoints.recipientDecisionsPending);
+    final pool = payloadPool(asMap(raw));
+    final list = pool['decisions'] is List
+        ? rowsOf(pool['decisions'])
+        : (raw is List ? rowsOf(raw) : const <Map<String, dynamic>>[]);
+    final now = DateTime.now();
+    return list
+        .map(RecipientDecision.fromJson)
+        .where(
+          (d) =>
+              d.decisionId.isNotEmpty &&
+              d.isPending &&
+              (d.expiresAt == null || d.expiresAt!.isAfter(now)),
+        )
+        .toList();
+  }
+
+  @override
   Future<RecipientDecision> getDecision(String decisionId) async {
     final raw = await _api.getRaw(
       ApiEndpoints.recipientDecision(decisionId.trim()),
