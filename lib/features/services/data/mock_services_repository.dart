@@ -205,15 +205,19 @@ class MockServicesRepository implements ServicesRepository {
     required double amount,
     required String networkId,
     required bool saveToLidaValue,
+    required String clientReference,
     bool isSelfTopup = false,
   }) async {
     await Future<void>.delayed(_latency);
     return _receipt(
       prefix: 'AIR',
-      title: saveToLidaValue ? 'Airtime saved to Lida Value' : 'Airtime sent',
-      message:
-          'Prymo top-up queued for $recipientNumber on network code $networkId.',
+      title: saveToLidaValue ? 'Airtime saved to Lida Value' : 'Airtime credited',
+      message: 'Airtime credited to $recipientNumber.',
       amount: amount,
+      recipientNumber: recipientNumber,
+      networkName: networkId,
+      currency: 'GHS',
+      serviceType: 'AIRTIME',
     );
   }
 
@@ -228,15 +232,19 @@ class MockServicesRepository implements ServicesRepository {
     String? senderNumber,
     String senderCountryCode = 'GH',
     String currency = 'USD',
+    required String clientReference,
     bool isSelfTopup = false,
   }) async {
     await Future<void>.delayed(_latency);
     return _receipt(
       prefix: 'RLD',
-      title: 'Global airtime sent',
-      message:
-          'Reloadly recharge accepted for $recipientNumber in $countryCode.',
+      title: 'Global airtime credited',
+      message: 'Airtime credited to $recipientNumber in $countryCode.',
       amount: amount,
+      recipientNumber: recipientNumber,
+      networkName: operatorId,
+      currency: currency,
+      serviceType: 'AIRTIME',
     );
   }
 
@@ -246,15 +254,21 @@ class MockServicesRepository implements ServicesRepository {
     required String networkId,
     required DataBundle bundle,
     required bool saveToLidaValue,
+    required String clientReference,
     bool isSelfTopup = false,
   }) async {
     await Future<void>.delayed(_latency);
+    final bundleLabel = '${bundle.dataAmount} ${bundle.name}'.trim();
     return _receipt(
       prefix: 'DAT',
-      title: saveToLidaValue ? 'Data value saved' : 'Data bundle sent',
-      message:
-          '${bundle.dataAmount} ${bundle.name} queued for $recipientNumber on network code $networkId.',
+      title: saveToLidaValue ? 'Data value saved' : 'Data bundle credited',
+      message: '$bundleLabel credited to $recipientNumber.',
       amount: bundle.price,
+      recipientNumber: recipientNumber,
+      networkName: networkId,
+      bundleName: bundleLabel,
+      currency: 'GHS',
+      serviceType: 'DATA',
     );
   }
 
@@ -270,15 +284,19 @@ class MockServicesRepository implements ServicesRepository {
     String? senderNumber,
     String senderCountryCode = 'GH',
     String currency = 'USD',
+    required String clientReference,
     bool isSelfTopup = false,
   }) async {
     await Future<void>.delayed(_latency);
     return _receipt(
       prefix: 'DAT',
-      title: 'Data bundle sent',
-      message:
-          'Reloadly data purchase accepted for $recipientNumber in $countryCode.',
+      title: 'Data bundle credited',
+      message: 'Data bundle credited to $recipientNumber in $countryCode.',
       amount: amount,
+      recipientNumber: recipientNumber,
+      networkName: operatorName ?? operatorId,
+      currency: currency,
+      serviceType: 'DATA',
     );
   }
 
@@ -556,6 +574,11 @@ class MockServicesRepository implements ServicesRepository {
     required String title,
     required String message,
     required double amount,
+    String? recipientNumber,
+    String? networkName,
+    String? bundleName,
+    String? currency,
+    String? serviceType,
   }) {
     final serial = 100000 + _random.nextInt(899999);
     return ServiceReceipt(
@@ -564,6 +587,11 @@ class MockServicesRepository implements ServicesRepository {
       message: message,
       amount: amount,
       createdAt: DateTime.now(),
+      recipientNumber: recipientNumber,
+      networkName: networkName,
+      bundleName: bundleName,
+      currency: currency,
+      serviceType: serviceType,
     );
   }
 

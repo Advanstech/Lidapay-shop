@@ -44,12 +44,20 @@ class PushNotificationService {
   bool _initialized = false;
   bool _firebaseAvailable = false;
   String? _lastToken;
+  GoRouter? _router;
+  bool Function()? _hasSession;
+  String? _pendingPayload;
 
   String? get currentToken => _lastToken;
   bool get isFirebaseAvailable => _firebaseAvailable;
 
   /// Call once during app startup or shell init.
-  Future<void> initialize({GoRouter? router}) async {
+  Future<void> initialize({
+    GoRouter? router,
+    bool Function()? hasSession,
+  }) async {
+    _router = router ?? _router;
+    _hasSession = hasSession ?? _hasSession;
     if (_initialized) return;
     _initialized = true;
 
@@ -242,10 +250,29 @@ class PushNotificationService {
 
   void _handleFcmMessage(RemoteMessage message, GoRouter router) {
     final payload = jsonEncode(message.data);
-    _handleNotificationPayload(payload, router);
+    handleNotificationPayload(payload, router);
   }
 
+  /// Flushes any cold-start notification payload once an authenticated session
+  /// exists so GoRouter does not bounce the user to `/splash` and lose the target.
+  void flushPendingNavigation([GoRouter? router]) {
+    final pending = _pendingPayload;
+    final targetRouter = router ?? _router;
+    if (pending == null || targetRouter == null) return;
+    if (_hasSession != null && !_hasSession!()) return;
+    _pendingPayload = null;
+    handleNotificationPayload(pending, targetRouter);
+  }
+
+  @visibleForTesting
+  void handleNotificationPayload(String rawPayload, GoRouter router) =>
+      _handleNotificationPayload(rawPayload, router);
+
   void _handleNotificationPayload(String rawPayload, GoRouter router) {
+    if (_hasSession != null && !_hasSession!()) {
+      _pendingPayload = rawPayload;
+      return;
+    }
     try {
       final data = jsonDecode(rawPayload) as Map<String, dynamic>;
       final notifId =

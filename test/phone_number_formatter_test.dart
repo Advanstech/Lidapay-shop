@@ -127,5 +127,24 @@ void main() {
 
       expect(result.text, equals('8012345678'));
     });
+
+    test('Ghana: caps subscriber digits at 9 and preserves 0233 Glo prefix', () {
+      final formatter = PhoneNumberInputFormatter(
+        dialCode: '+233',
+        isoCode: 'GH',
+      );
+
+      final capped = formatter.formatEditUpdate(
+        const TextEditingValue(text: '244954473'),
+        const TextEditingValue(text: '2449544739'),
+      );
+      expect(capped.text, equals('244954473'));
+
+      final glo = formatter.formatEditUpdate(
+        const TextEditingValue(text: '233'),
+        const TextEditingValue(text: '2334'),
+      );
+      expect(glo.text, equals('2334'));
+    });
   });
 }

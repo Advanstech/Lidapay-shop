@@ -392,6 +392,9 @@ class PaymentSessionNotifier extends StateNotifier<PaymentSessionState> {
   /// Manual "I've completed payment" path — identical verification to the
   /// deep-link return. Also used by the app-resume listener.
   Future<void> recheck() async {
+    // Don't re-check if already completed — prevents duplicate delivery
+    // on app resume when the pending record was not yet cleared.
+    if (state.phase == PaymentPhase.completed) return;
     final pending = _pending ?? _store.load();
     if (pending == null) return;
     _pending = pending;
@@ -614,6 +617,11 @@ class PaymentSessionNotifier extends StateNotifier<PaymentSessionState> {
   /// backend is told nothing about the payment here; the same provider
   /// endpoints the old app credits post-payment are reused verbatim.
   Future<void> _credit(PendingPayment pending) async {
+    // Idempotency guard: if already completed, do not re-deliver.
+    // This prevents duplicate credits when the app resumes after a
+    // successful top-up but the pending record was not yet cleared.
+    if (state.phase == PaymentPhase.completed) return;
+
     state = PaymentSessionState(
       phase: PaymentPhase.crediting,
       pending: pending,
@@ -686,6 +694,7 @@ Future<ServiceReceipt> deliverPendingPayment(
         amount: (pending.params['amount'] as num).toDouble(),
         networkId: pending.params['networkId'] as String,
         saveToLidaValue: pending.params['saveToLidaValue'] == true,
+        clientReference: pending.clientReference,
         isSelfTopup: pending.params['isSelfTopup'] == true,
       );
     case PendingPaymentKind.globalAirtime:
@@ -700,6 +709,7 @@ Future<ServiceReceipt> deliverPendingPayment(
         senderCountryCode:
             pending.params['senderCountryCode']?.toString() ?? 'GH',
         currency: pending.params['currency']?.toString() ?? 'USD',
+        clientReference: pending.clientReference,
         isSelfTopup: pending.params['isSelfTopup'] == true,
       );
     case PendingPaymentKind.ghanaData:
@@ -714,6 +724,7 @@ Future<ServiceReceipt> deliverPendingPayment(
           dataAmount: bundle['dataAmount'].toString(),
         ),
         saveToLidaValue: pending.params['saveToLidaValue'] == true,
+        clientReference: pending.clientReference,
         isSelfTopup: pending.params['isSelfTopup'] == true,
       );
     case PendingPaymentKind.globalData:
@@ -729,6 +740,7 @@ Future<ServiceReceipt> deliverPendingPayment(
         senderCountryCode:
             pending.params['senderCountryCode']?.toString() ?? 'GH',
         currency: pending.params['currency']?.toString() ?? 'USD',
+        clientReference: pending.clientReference,
         isSelfTopup: pending.params['isSelfTopup'] == true,
       );
     case PendingPaymentKind.shopOrder:

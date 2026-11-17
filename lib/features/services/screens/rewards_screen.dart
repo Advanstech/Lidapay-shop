@@ -41,9 +41,6 @@ class LidaPointsScreen extends ConsumerWidget {
             await ref.read(lidaPointsProvider.future);
           },
           child: CustomScrollView(
-            physics: const BouncingScrollPhysics(
-              parent: AlwaysScrollableScrollPhysics(),
-            ),
             slivers: [
               SliverToBoxAdapter(
                 child: _PointsHero(wallet: wallet, isDark: isDark),
@@ -53,9 +50,8 @@ class LidaPointsScreen extends ConsumerWidget {
                   padding: const EdgeInsets.fromLTRB(20, 18, 20, 6),
                   child: Text(
                     'Redeem points',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
+                    style: Theme.of(context).textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w800),
                   ),
                 ),
               ),
@@ -314,7 +310,7 @@ class _RedeemOptionTile extends ConsumerWidget {
                         Text(
                           option.minPoints > 0
                               ? '${Formatters.compact(option.minPoints)} pts minimum'
-                                  '${option.description.isNotEmpty ? ' · ${option.description}' : ''}'
+                                    '${option.description.isNotEmpty ? ' · ${option.description}' : ''}'
                               : option.description,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
@@ -395,8 +391,7 @@ class _RedeemSheetState extends ConsumerState<_RedeemSheet> {
   @override
   void initState() {
     super.initState();
-    final registered =
-        ref.read(authSessionProvider)?.user.phoneNumber ?? '';
+    final registered = ref.read(authSessionProvider)?.user.phoneNumber ?? '';
     _destination.text = registered.replaceAll(RegExp(r'[^0-9]'), '');
     if (_destination.text.startsWith('233')) {
       _destination.text = '0${_destination.text.substring(3)}';
@@ -641,9 +636,7 @@ class _PointsActivityRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final isCredit = receipt.isCredit ?? true;
-    final label = receipt.isCredit == null
-        ? ''
-        : (isCredit ? '+' : '-');
+    final label = receipt.isCredit == null ? '' : (isCredit ? '+' : '-');
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
       leading: Container(
@@ -807,7 +800,10 @@ class InviteEarnScreen extends ConsumerWidget {
                             children: [
                               Expanded(
                                 child: OutlinedButton.icon(
-                                  icon: const Icon(Icons.copy_rounded, size: 18),
+                                  icon: const Icon(
+                                    Icons.copy_rounded,
+                                    size: 18,
+                                  ),
                                   label: const Text('Copy'),
                                   onPressed: data.code.isEmpty
                                       ? null
@@ -815,15 +811,14 @@ class InviteEarnScreen extends ConsumerWidget {
                                           Clipboard.setData(
                                             ClipboardData(text: data.code),
                                           );
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
-                                            const SnackBar(
-                                              content: Text(
-                                                'Invite code copied',
-                                              ),
-                                            ),
-                                          );
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                                const SnackBar(
+                                                  content: Text(
+                                                    'Invite code copied',
+                                                  ),
+                                                ),
+                                              );
                                         },
                                 ),
                               ),

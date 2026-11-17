@@ -10,6 +10,14 @@ import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/app_button.dart';
 import '../data/service_models.dart';
 
+String _formatReceiptAmount(ServiceReceipt r) {
+  final curr = r.currency?.trim().toUpperCase();
+  if (curr != null && curr.isNotEmpty && curr != 'GHS') {
+    return '$curr ${r.amount.toStringAsFixed(2)}';
+  }
+  return Formatters.currency(r.amount);
+}
+
 /// Full-screen success receipt after a delivered purchase — celebratory
 /// header with the amount front and centre, then a clean detail card and a
 /// copyable reference. Shared by airtime, data and wallet-funded flows.
@@ -152,7 +160,7 @@ class ServiceReceiptScreen extends StatelessWidget {
                       child: Column(
                         children: [
                           Text(
-                            Formatters.currency(receipt.amount),
+                            _formatReceiptAmount(receipt),
                             style: const TextStyle(
                               fontSize: 30,
                               fontWeight: FontWeight.w900,
@@ -161,7 +169,11 @@ class ServiceReceiptScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Charged',
+                            receipt.serviceType == 'AIRTIME'
+                                ? 'Airtime credited'
+                                : receipt.serviceType == 'DATA'
+                                ? 'Data credited'
+                                : 'Charged',
                             style: TextStyle(
                               fontSize: 12.5,
                               fontWeight: FontWeight.w600,
@@ -191,7 +203,7 @@ class ServiceReceiptScreen extends StatelessWidget {
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: const Text(
-                                'Delivered',
+                                'Credited',
                                 style: TextStyle(
                                   color: Color(0xFF33B457),
                                   fontSize: 12,
@@ -200,6 +212,31 @@ class ServiceReceiptScreen extends StatelessWidget {
                               ),
                             ),
                           ),
+                          if (receipt.recipientNumber != null &&
+                              receipt.recipientNumber!.isNotEmpty) ...[
+                            const SizedBox(height: 14),
+                            _ReceiptRow(
+                              label: 'Recipient',
+                              value: receipt.recipientNumber!,
+                              mono: true,
+                            ),
+                          ],
+                          if (receipt.networkName != null &&
+                              receipt.networkName!.isNotEmpty) ...[
+                            const SizedBox(height: 14),
+                            _ReceiptRow(
+                              label: 'Network',
+                              value: receipt.networkName!,
+                            ),
+                          ],
+                          if (receipt.bundleName != null &&
+                              receipt.bundleName!.isNotEmpty) ...[
+                            const SizedBox(height: 14),
+                            _ReceiptRow(
+                              label: 'Bundle',
+                              value: receipt.bundleName!,
+                            ),
+                          ],
                           const SizedBox(height: 14),
                           _ReceiptRow(
                             label: 'Date',
@@ -363,12 +400,25 @@ class _ReceiptShareSheetState extends State<_ReceiptShareSheet> {
   final _boundaryKey = GlobalKey();
   bool _busy = false;
 
-  String get _textReceipt =>
-      'LidaPay receipt\n${widget.receipt.title}\n'
-      '${widget.receipt.message}\n'
-      'Amount: ${Formatters.currency(widget.receipt.amount)}\n'
-      'Reference: ${widget.receipt.reference}\n'
-      'Date: ${Formatters.dateTime(widget.receipt.createdAt.toLocal())}';
+  String get _textReceipt {
+    final r = widget.receipt;
+    final lines = <String>[
+      'LidaPay receipt',
+      r.title,
+      'Amount: ${_formatReceiptAmount(r)}',
+      'Status: Credited',
+      if (r.recipientNumber != null && r.recipientNumber!.isNotEmpty)
+        'Recipient: ${r.recipientNumber}',
+      if (r.networkName != null && r.networkName!.isNotEmpty)
+        'Network: ${r.networkName}',
+      if (r.bundleName != null && r.bundleName!.isNotEmpty)
+        'Bundle: ${r.bundleName}',
+      if (r.message.isNotEmpty) 'Details: ${r.message}',
+      'Reference: ${r.reference}',
+      'Date: ${Formatters.dateTime(r.createdAt.toLocal())}',
+    ];
+    return lines.join('\n');
+  }
 
   Future<void> _share() async {
     if (_busy) return;
@@ -471,6 +521,12 @@ class _ReceiptDocument extends StatelessWidget {
 
   final ServiceReceipt receipt;
 
+  String get _receiptSubtitle => switch (receipt.serviceType) {
+    'AIRTIME' => 'Airtime receipt',
+    'DATA' => 'Data receipt',
+    _ => 'Transaction receipt',
+  };
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -489,10 +545,10 @@ class _ReceiptDocument extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.fromLTRB(22, 18, 22, 16),
             decoration: const BoxDecoration(gradient: AppColors.heroGradient),
-            child: const Column(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                const Text(
                   'LIDAPAY',
                   style: TextStyle(
                     color: Colors.white,
@@ -501,10 +557,10 @@ class _ReceiptDocument extends StatelessWidget {
                     letterSpacing: 3,
                   ),
                 ),
-                SizedBox(height: 2),
+                const SizedBox(height: 2),
                 Text(
-                  'Payment receipt',
-                  style: TextStyle(color: Colors.white70, fontSize: 11.5),
+                  _receiptSubtitle,
+                  style: const TextStyle(color: Colors.white70, fontSize: 11.5),
                 ),
               ],
             ),
@@ -516,7 +572,7 @@ class _ReceiptDocument extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  Formatters.currency(receipt.amount),
+                  _formatReceiptAmount(receipt),
                   style: const TextStyle(
                     fontSize: 30,
                     fontWeight: FontWeight.w900,
@@ -535,7 +591,7 @@ class _ReceiptDocument extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Text(
-                    'SUCCESSFUL',
+                    'CREDITED',
                     style: TextStyle(
                       color: Color(0xFF33B457),
                       fontSize: 11,
@@ -548,8 +604,29 @@ class _ReceiptDocument extends StatelessWidget {
                 const _DashedDivider(),
                 const SizedBox(height: 14),
                 _DocRow(label: 'Service', value: receipt.title),
-                const SizedBox(height: 10),
-                _DocRow(label: 'Details', value: receipt.message),
+                if (receipt.recipientNumber != null &&
+                    receipt.recipientNumber!.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  _DocRow(
+                    label: 'Recipient',
+                    value: receipt.recipientNumber!,
+                    mono: true,
+                  ),
+                ],
+                if (receipt.networkName != null &&
+                    receipt.networkName!.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  _DocRow(label: 'Network', value: receipt.networkName!),
+                ],
+                if (receipt.bundleName != null &&
+                    receipt.bundleName!.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  _DocRow(label: 'Bundle', value: receipt.bundleName!),
+                ],
+                if (receipt.message.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  _DocRow(label: 'Details', value: receipt.message),
+                ],
                 const SizedBox(height: 10),
                 _DocRow(
                   label: 'Date',

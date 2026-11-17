@@ -6,8 +6,14 @@ import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/brand_mark.dart';
 
 class _Page {
-  const _Page({required this.title, required this.subtitle, required this.art});
+  const _Page({
+    required this.eyebrow,
+    required this.title,
+    required this.subtitle,
+    required this.art,
+  });
 
+  final String eyebrow;
   final String title;
   final String subtitle;
   final String art;
@@ -28,18 +34,21 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   static const _pages = [
     _Page(
-      title: 'Instant airtime & data, worldwide',
-      subtitle: 'Top up any phone number across ~150 countries in seconds — delivered to MTN, Telecel, AT and beyond.',
-      art: 'assets/images/onboarding_wallet.png',
-    ),
-    _Page(
-      title: 'Shop deals from partners you trust',
-      subtitle: 'Electronics, appliances and vouchers from Melcom Ghana and more — flash deals right on your home screen.',
+      eyebrow: 'AIRTIME & DATA',
+      title: 'Stay connected, wherever life happens',
+      subtitle: 'Top up your own phone or someone else’s in Ghana and around the world, with clear review before you pay.',
       art: 'assets/images/onboarding_globe.png',
     ),
     _Page(
-      title: 'Lida Value — value that waits for you',
-      subtitle: 'Received airtime from someone? Keep it as Lida Value, spend it in the shop, or convert it to cash.',
+      eyebrow: 'LIDA VALUE',
+      title: 'Value that stays ready for you',
+      subtitle: 'Use Lida Value for airtime and data, send it to someone else, or explore eligible buyback options.',
+      art: 'assets/images/onboarding_wallet.png',
+    ),
+    _Page(
+      eyebrow: 'SHOP & REWARDS',
+      title: 'Partner deals and rewards in one place',
+      subtitle: 'Discover products and vouchers from trusted partners, track your orders, and grow your Lida Points.',
       art: 'assets/images/onboarding_growth.png',
     ),
   ];
@@ -121,7 +130,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               ),
               SafeArea(
                 child: CustomScrollView(
-                  physics: const BouncingScrollPhysics(),
                   slivers: [
                     SliverFillRemaining(
                       hasScrollBody: false,
@@ -145,9 +153,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                 const SizedBox(width: 10),
                                 Text(
                                   'Lidapay',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .titleMedium
+                                  style: Theme.of(context).textTheme.titleMedium
                                       ?.copyWith(
                                         color: Colors.white,
                                         fontWeight: FontWeight.w700,
@@ -168,8 +174,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                         color: Colors.white.withValues(
                                           alpha: 0.12,
                                         ),
-                                        borderRadius:
-                                            BorderRadius.circular(20),
+                                        borderRadius: BorderRadius.circular(20),
                                         border: Border.all(
                                           color: Colors.white.withValues(
                                             alpha: 0.2,
@@ -199,6 +204,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
+                                Text(
+                                  page.eyebrow,
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.72),
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 1.5,
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
                                 Text(
                                   page.title,
                                   style: Theme.of(context)
@@ -260,7 +275,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                               const SizedBox(height: 14),
                               Center(
                                 child: TextButton(
-                                  onPressed: () => context.go(AppRoutes.login),
+                                  onPressed: _finish,
                                   child: Text(
                                     'Already have an account? Sign in',
                                     style: TextStyle(

@@ -140,12 +140,90 @@ void main() {
       amount: 5,
       networkId: '4',
       saveToLidaValue: false,
+      clientReference: 'LDP-test-ref-1',
     );
 
     expect(receipt.reference, 'AIR-9001');
     expect(receipt.message, contains('SUBMITTED'));
     expect(receipt.amount, 5);
-    expect(receipt.title, 'Airtime sent');
+    expect(receipt.title, 'Airtime credited');
+    expect(receipt.recipientNumber, '0241234567');
+    expect(receipt.networkName, 'MTN Ghana');
+    expect(receipt.currency, 'GHS');
+    expect(receipt.serviceType, 'AIRTIME');
+  });
+
+  test(
+    'airtime receipt strips the provider balance from the message',
+    () async {
+      final (api, _) = await _client(
+        (_) => {
+          'status': 'OK',
+          'status-code': '00',
+          'message':
+              'You have successfully recharged 0244588584 with GHS 1.00, '
+              'you were charged GHS 1.00 and your current balance is GHS 820.50',
+          'trxn': 'b3fa7000e16711f19f19958688549607',
+          'balance_after': 820.5,
+        },
+      );
+      final receipt = await RemoteServicesRepository(api).buyLocalAirtime(
+        recipientNumber: '0244588584',
+        amount: 1,
+        networkId: '4',
+        saveToLidaValue: false,
+        clientReference: 'LDP-test-ref-clean',
+      );
+
+      expect(receipt.message, contains('successfully recharged'));
+      expect(receipt.message, isNot(contains('balance')));
+      expect(receipt.message, isNot(contains('820')));
+      expect(receipt.reference, 'b3fa7000e16711f19f19958688549607');
+    },
+  );
+
+  test('airtime topup rejects HTTP 201 provider failure payload', () async {
+    final (api, _) = await _client(
+      (_) => {
+        'status-code': '09',
+        'status': 'ERROR',
+        'message': 'Network check failed locally',
+      },
+      status: (_) => 201,
+    );
+    await expectLater(
+      RemoteServicesRepository(api).buyLocalAirtime(
+        recipientNumber: '233244954473',
+        amount: 1,
+        networkId: '4',
+        saveToLidaValue: false,
+        clientReference: 'LDP-fail-ref-1',
+      ),
+      throwsA(
+        isA<ApiException>().having(
+          (e) => e.message,
+          'message',
+          'Network check failed locally',
+        ),
+      ),
+    );
+  });
+
+  test('airtime topup rejects HTTP 201 failure message even without status', () async {
+    final (api, _) = await _client(
+      (_) => {'message': 'Network check failed locally'},
+      status: (_) => 201,
+    );
+    await expectLater(
+      RemoteServicesRepository(api).buyLocalAirtime(
+        recipientNumber: '0244954473',
+        amount: 1,
+        networkId: '4',
+        saveToLidaValue: false,
+        clientReference: 'LDP-fail-ref-2',
+      ),
+      throwsA(isA<ApiException>()),
+    );
   });
 
   test(
@@ -168,6 +246,7 @@ void main() {
         countryCode: 'NG',
         recipientDialCode: '+234',
         currency: 'NGN',
+        clientReference: 'LDP-test-ref-2',
       );
 
       expect(receipt.reference, 'TP-77');
@@ -197,6 +276,7 @@ void main() {
         recipientNumber: '0241234567',
         amount: 5,
         countryCode: 'GH',
+        clientReference: 'LDP-test-ref-3',
       ),
       throwsA(isA<ApiException>()),
     );
@@ -223,6 +303,7 @@ void main() {
       networkId: '6',
       saveToLidaValue: false,
       isSelfTopup: true,
+      clientReference: 'LDP-test-ref-4',
     );
     final request = adapter.requests.single;
     expect(request.path, '/api/v1/airtime/topup');
@@ -244,6 +325,7 @@ void main() {
       operatorId: '341',
       recipientDialCode: '+234',
       senderNumber: '0244588584',
+      clientReference: 'LDP-test-ref-5',
     );
     expect(receipt.reference, 'RLD-55');
     expect(
@@ -265,6 +347,7 @@ void main() {
         amount: 10,
         countryCode: 'NG',
         recipientDialCode: '+234',
+        clientReference: 'LDP-test-ref-6',
       ),
       throwsA(
         isA<ApiException>().having(
@@ -385,6 +468,7 @@ void main() {
           countryCode: 'NG',
           recipientDialCode: '+234',
           currency: 'NGN',
+          clientReference: 'LDP-test-ref-7',
         );
 
     expect(receipt.reference, 'DAT-9');
@@ -413,6 +497,7 @@ void main() {
         recipientNumber: '0241234567',
         amount: 10,
         countryCode: 'GH',
+        clientReference: 'LDP-test-ref-8',
       ),
       throwsA(isA<ApiException>()),
     );
@@ -433,6 +518,7 @@ void main() {
       countryCode: 'NG',
       operatorId: '344',
       recipientDialCode: '+234',
+      clientReference: 'LDP-test-ref-9',
     );
     expect(
       adapter.requests.where((r) => r.path.contains('auto-detect')),
@@ -1413,6 +1499,37 @@ void main() {
     expect(api.tokenStore.refreshToken, 'fresh-refresh');
   });
 
+  test('401 refresh unwraps nested data and camelCase tokens', () async {
+    var protectedCalls = 0;
+    final (api, _) = await _client(
+      (options) {
+        if (options.path == '/api/v1/auth/refresh') {
+          return {
+            'data': {
+              'accessToken': 'camel-access',
+              'refreshToken': 'camel-refresh',
+            },
+          };
+        }
+        return {'balance': 50};
+      },
+      status: (options) {
+        if (options.path == '/api/v1/auth/refresh') return 200;
+        protectedCalls++;
+        return protectedCalls == 1 ? 401 : 200;
+      },
+    );
+    await api.tokenStore.saveSession(
+      accessToken: 'expired',
+      refreshToken: 'refresh-old',
+    );
+
+    final wallet = await api.get('/api/v1/users/wallet/user');
+    expect(wallet['balance'], 50);
+    expect(api.tokenStore.accessToken, 'camel-access');
+    expect(api.tokenStore.refreshToken, 'camel-refresh');
+  });
+
   test('a second 401 stops retrying and clears the session', () async {
     final (api, adapter) = await _client(
       (_) => {'access_token': 'fresh', 'refresh_token': 'rotated'},
@@ -1809,6 +1926,7 @@ void main() {
           networkId: '6',
           bundle: bundle,
           saveToLidaValue: false,
+          clientReference: 'LDP-test-ref-10',
         );
 
         final bad = adapter.requests.last.data as Map;
@@ -1826,6 +1944,7 @@ void main() {
           bundle: bundle,
           saveToLidaValue: false,
           isSelfTopup: true,
+          clientReference: 'LDP-test-ref-11',
         );
 
         final good = adapter.requests.last.data as Map;
@@ -1849,6 +1968,7 @@ void main() {
         amount: 5,
         networkId: '4',
         saveToLidaValue: false,
+        clientReference: 'LDP-test-ref-12',
       );
 
       final body = adapter.requests.last.data as Map;
@@ -1956,6 +2076,48 @@ void main() {
           adapter.requests.any((r) => r.path.contains('/transactions/user/')),
           isFalse,
         );
+      },
+    );
+
+    test(
+      'history pagination returns a has-more sentinel row',
+      () async {
+        final (api, _) = await _client(
+          (options) {
+            if (options.path.contains('/transactions/user/')) {
+              final limit =
+                  (options.queryParameters['limit'] as num?)?.toInt() ?? 50;
+              return {
+                'transactions': [
+                  for (var i = 0; i < 12 && i < limit; i++)
+                    {
+                      'transId': 'TXN-$i',
+                      'initiatedAt': '2026-10-${(i % 9) + 10}T10:00:00.000Z',
+                      'monetary': {'amount': 5 + i},
+                      'transType': 'AIRTIME',
+                      'status': 'SUCCESS',
+                    },
+                ],
+              };
+            }
+            if (options.path == '/api/v1/users/account') return {};
+            if (options.path == '/api/v1/lida-value/history') {
+              return <Object>[];
+            }
+            if (options.path == '/api/v1/lidapoints/history') {
+              return <Object>[];
+            }
+            if (options.path == '/api/v1/shop/orders') return <Object>[];
+            return {};
+          },
+        );
+        final repo = RemoteHistoryRepository(api, 'user-1');
+
+        final page1 = await repo.getTransactions(page: 1, pageSize: 10);
+        expect(page1, hasLength(11));
+
+        final page2 = await repo.getTransactions(page: 2, pageSize: 10);
+        expect(page2, hasLength(2));
       },
     );
 

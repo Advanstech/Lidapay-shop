@@ -91,9 +91,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-            'Password updated. Sign in with your new password.',
-          ),
+          content: Text('Password updated. Sign in with your new password.'),
         ),
       );
     });
@@ -345,7 +343,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       await ref
           .read(authSessionProvider.notifier)
           .login(LoginRequest(username: username, password: _password.text));
-        await _finishSignIn();
+      await _finishSignIn();
     } on ApiException catch (e) {
       if (mounted) setState(() => _apiError = e.message);
     } finally {
@@ -389,10 +387,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         final prefs = await SharedPreferences.getInstance();
         final dismissed = prefs.getBool(_biometricPromptKey) ?? false;
         final biometrics = await _localAuth.getAvailableBiometrics();
-        if (!alreadyEnabled &&
-            !dismissed &&
-            biometrics.isNotEmpty &&
-            mounted) {
+        if (!alreadyEnabled && !dismissed && biometrics.isNotEmpty && mounted) {
           final enable = await showDialog<bool>(
             context: context,
             builder: (dialogContext) => AlertDialog(
@@ -421,7 +416,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           );
           if (enable == true && mounted) {
             final authenticated = await _localAuth.authenticate(
-              localizedReason: 'Confirm your identity to enable biometric sign-in',
+              localizedReason:
+                  'Confirm your identity to enable biometric sign-in',
               options: const AuthenticationOptions(
                 biometricOnly: true,
                 stickyAuth: true,
@@ -452,7 +448,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Sign in with your password first to enable biometrics.'),
+              content: Text(
+                'Sign in with your password first to enable biometrics.',
+              ),
             ),
           );
         }
@@ -473,7 +471,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     } on PlatformException catch (error) {
       if (mounted) {
         setState(() {
-          _apiError = error.message ?? 'Biometric sign-in could not be completed.';
+          _apiError =
+              error.message ?? 'Biometric sign-in could not be completed.';
         });
       }
     } catch (_) {
@@ -490,23 +489,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      body: Stack(
-        children: [
-          const AuthHeroHeader(
-            height: 350,
-            title: 'Welcome back',
-            subtitle:
-                'Sign in to send airtime, shop deals and grow your Lida Value.',
-          ),
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: SingleChildScrollView(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.viewInsetsOf(context).bottom,
-              ),
+      body: SingleChildScrollView(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: Column(
+          children: [
+            const AuthHeroHeader(
+              height: 320,
+              title: 'Welcome back',
+              subtitle: 'Sign in to send airtime, shop deals and grow your Lida Value.',
+            ),
+            Transform.translate(
+              offset: const Offset(0, -28),
               child: TweenAnimationBuilder<Offset>(
                 tween: Tween<Offset>(
-                  begin: const Offset(0, 1),
+                  begin: const Offset(0, 0.08),
                   end: Offset.zero,
                 ),
                 duration: const Duration(milliseconds: 550),
@@ -518,6 +516,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   );
                 },
                 child: Container(
+                  constraints: BoxConstraints(
+                    minHeight: MediaQuery.sizeOf(context).height - 292,
+                  ),
                   padding: const EdgeInsets.fromLTRB(24, 30, 24, 36),
                   decoration: BoxDecoration(
                     color: scheme.surface,
@@ -572,8 +573,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -844,8 +845,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ],
                 )
               : Text(
-                  _otpStatusMessage ??
-                      'Enter the 6-digit verification code sent to your account.',
+                  _otpStatusMessage ?? 'Enter the 6-digit verification code sent to your account.',
                   key: const ValueKey('otp_status'),
                   style: TextStyle(
                     color: scheme.onSurfaceVariant,

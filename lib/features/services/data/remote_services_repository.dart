@@ -7,6 +7,7 @@ import '../../../core/network/api_endpoints.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/network/api_payload.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/utils/ghana_networks.dart';
 import 'service_models.dart';
 import 'services_repository.dart';
 
@@ -1042,28 +1043,36 @@ class RemoteServicesRepository implements ServicesRepository {
     required double amount,
     required String networkId,
     required bool saveToLidaValue,
+    required String clientReference,
     bool isSelfTopup = false,
   }) async {
+    final recipient = _normalizedGhanaLocal(recipientNumber);
     final raw = await _api.postRaw(
       ApiEndpoints.airtimeTopup,
       body: {
-        'recipientNumber': recipientNumber,
+        'recipientNumber': recipient,
         'amount': amount,
         'network': _networkCode(networkId),
         'saveToLidaValue': saveToLidaValue,
         // USE self-topup bypasses the recipient-decision flow on the backend;
         // SEND top-ups leave it false so a registered recipient can choose.
         'isSelfTopup': isSelfTopup,
+        'clientReference': clientReference,
         if (_effectiveUserId != null) 'userId': _effectiveUserId,
         if (_effectiveUserName != null) 'userName': _effectiveUserName,
       },
     );
+    final networkLabel = GhanaNetworks.nameForCode(networkId);
     return _receipt(
       raw,
-      title: saveToLidaValue ? 'Airtime saved to Lida Value' : 'Airtime sent',
+      title: saveToLidaValue ? 'Airtime saved to Lida Value' : 'Airtime credited',
       amount: amount,
       prefix: 'AIR',
-      fallbackMessage: 'Prymo One4All top-up submitted for $recipientNumber.',
+      fallbackMessage: 'Airtime credited to $recipient.',
+      recipientNumber: recipient,
+      networkName: networkLabel,
+      currency: 'GHS',
+      serviceType: 'AIRTIME',
     );
   }
 
@@ -1073,17 +1082,13 @@ class RemoteServicesRepository implements ServicesRepository {
     required String networkId,
     required DataBundle bundle,
     required bool saveToLidaValue,
+    required String clientReference,
     bool isSelfTopup = false,
   }) async {
     // The Ghana Prymo endpoint expects the local 0XXXXXXXXX format and the
     // user identity fields for transaction ownership (same contract as the
     // legacy Lidapay app).
-    var recipient = recipientNumber.replaceAll(RegExp(r'[^0-9]'), '');
-    if (recipient.startsWith('233')) {
-      recipient = '0${recipient.substring(3)}';
-    } else if (recipient.length == 9) {
-      recipient = '0$recipient';
-    }
+    final recipient = _normalizedGhanaLocal(recipientNumber);
     final raw = await _api.postRaw(
       ApiEndpoints.internetBuydata,
       body: {
@@ -1097,16 +1102,33 @@ class RemoteServicesRepository implements ServicesRepository {
         'currency': 'GHS',
         'saveToLidaValue': saveToLidaValue,
         'isSelfTopup': isSelfTopup,
+        'clientReference': clientReference,
       },
     );
+    final networkLabel = GhanaNetworks.nameForCode(networkId);
+    final bundleLabel = '${bundle.dataAmount} ${bundle.name}'.trim();
     return _receipt(
       raw,
-      title: saveToLidaValue ? 'Data value saved' : 'Data bundle sent',
+      title: saveToLidaValue ? 'Data value saved' : 'Data bundle credited',
       amount: bundle.price,
       prefix: 'DAT',
-      fallbackMessage:
-          '${bundle.dataAmount} ${bundle.name} submitted for $recipientNumber.',
+      fallbackMessage: '$bundleLabel credited to $recipient.',
+      recipientNumber: recipient,
+      networkName: networkLabel,
+      bundleName: bundleLabel,
+      currency: 'GHS',
+      serviceType: 'DATA',
     );
+  }
+
+  static String _normalizedGhanaLocal(String input) {
+    var recipient = input.replaceAll(RegExp(r'[^0-9]'), '');
+    if (recipient.startsWith('233')) {
+      recipient = '0${recipient.substring(3)}';
+    } else if (recipient.length == 9) {
+      recipient = '0$recipient';
+    }
+    return recipient;
   }
 
   @override
@@ -1121,6 +1143,7 @@ class RemoteServicesRepository implements ServicesRepository {
     String? senderNumber,
     String senderCountryCode = 'GH',
     String currency = 'USD',
+    required String clientReference,
     bool isSelfTopup = false,
   }) async {
     final iso = countryCode.trim().toUpperCase();
@@ -1168,16 +1191,21 @@ class RemoteServicesRepository implements ServicesRepository {
         // recipient picks direct data or Lida Value.
         'enableRecipientChoice': !isSelfTopup,
         'isSelfTopup': isSelfTopup,
+        'clientReference': clientReference,
         if (_effectiveUserId != null) 'userId': _effectiveUserId,
         if (_effectiveUserName != null) 'userName': _effectiveUserName,
       },
     );
     return _receipt(
       raw,
-      title: 'Data bundle sent',
+      title: 'Data bundle credited',
       amount: amount,
       prefix: 'DAT',
-      fallbackMessage: 'Reloadly data purchase submitted for $msisdn.',
+      fallbackMessage: '$currency ${amount.toStringAsFixed(2)} data bundle credited to $msisdn.',
+      recipientNumber: msisdn,
+      networkName: resolvedName,
+      currency: currency,
+      serviceType: 'DATA',
     );
   }
 
@@ -1192,6 +1220,7 @@ class RemoteServicesRepository implements ServicesRepository {
     String? senderNumber,
     String senderCountryCode = 'GH',
     String currency = 'USD',
+    required String clientReference,
     bool isSelfTopup = false,
   }) async {
     final iso = countryCode.trim().toUpperCase();
@@ -1202,16 +1231,22 @@ class RemoteServicesRepository implements ServicesRepository {
     }
     final msisdn = _normalizedMsisdn(recipientNumber, iso, recipientDialCode);
     var resolvedOperator = double.tryParse(operatorId?.trim() ?? '');
+    String? resolvedOperatorName;
     if (resolvedOperator == null) {
       final lookup = await _api.postRaw(
         ApiEndpoints.reloadlyPhoneLookup,
         body: {'phone': msisdn, 'countryCode': iso},
       );
-      resolvedOperator = numberField(payloadPool(asMap(lookup)), const [
+      final lookupPool = payloadPool(asMap(lookup));
+      resolvedOperator = numberField(lookupPool, const [
         'operatorId',
         'operator_id',
         'operatorID',
         'id',
+      ]);
+      resolvedOperatorName = stringField(lookupPool, const [
+        'name',
+        'operatorName',
       ]);
     }
     if (resolvedOperator == null) {
@@ -1235,14 +1270,19 @@ class RemoteServicesRepository implements ServicesRepository {
         // which is how value flows back into the wallet after this call.
         'enableRecipientChoice': !isSelfTopup,
         'isSelfTopup': isSelfTopup,
+        'clientReference': clientReference,
       },
     );
     return _receipt(
       recharge,
-      title: 'Global airtime sent',
+      title: 'Global airtime credited',
       amount: amount,
       prefix: 'RLD',
-      fallbackMessage: 'Reloadly recharge submitted for $msisdn.',
+      fallbackMessage: '$currency ${amount.toStringAsFixed(2)} airtime credited to $msisdn.',
+      recipientNumber: msisdn,
+      networkName: resolvedOperatorName,
+      currency: currency,
+      serviceType: 'AIRTIME',
     );
   }
 
@@ -1767,25 +1807,33 @@ class RemoteServicesRepository implements ServicesRepository {
     required double amount,
     required String prefix,
     required String fallbackMessage,
+    String? recipientNumber,
+    String? networkName,
+    String? bundleName,
+    String? currency,
+    String? serviceType,
   }) {
     final pool = payloadPool(asMap(raw));
+    final pendingTopup = _pendingTopupOf(pool);
+    final serverMessage = stringField(pool, const [
+      'message',
+      'Message',
+      'error',
+      'status',
+      'Status',
+      'description',
+      'remarks',
+      'responseData',
+    ]);
+    _ensureDeliverySucceeded(pool, pendingTopup, serverMessage);
     return ServiceReceipt(
-      pendingTopup: _pendingTopupOf(pool),
+      pendingTopup: pendingTopup,
       reference:
           stringField(pool, _referenceKeys) ??
           '$prefix-${DateTime.now().millisecondsSinceEpoch}',
       title: title,
       message: _withDecisionNote(
-        stringField(pool, const [
-              'message',
-              'Message',
-              'status',
-              'Status',
-              'description',
-              'remarks',
-              'responseData',
-            ]) ??
-            fallbackMessage,
+        _cleanReceiptMessage(serverMessage ?? fallbackMessage),
         pool,
       ),
       amount:
@@ -1797,7 +1845,126 @@ class RemoteServicesRepository implements ServicesRepository {
           ]) ??
           amount,
       createdAt: _dateOf(pool),
+      recipientNumber:
+          stringField(pool, const [
+            'recipientNumber',
+            'recipientPhone',
+            'recipient',
+            'phoneNumber',
+            'msisdn',
+          ]) ??
+          recipientNumber,
+      networkName:
+          stringField(pool, const ['networkName', 'operatorName', 'network']) ??
+          networkName,
+      bundleName:
+          stringField(pool, const ['bundleName', 'planName', 'dataPlan']) ??
+          bundleName,
+      currency: stringField(pool, const ['currency', 'currencyCode']) ?? currency,
+      serviceType: serviceType,
     );
+  }
+
+  /// Providers (especially Prymo/One4All) occasionally return application-level
+  /// failures wrapped inside an HTTP 200/201 response (for example
+  /// `Network check failed locally`). Reject those explicitly so the app never
+  /// presents a false green "Credited" receipt when delivery failed.
+  static void _ensureDeliverySucceeded(
+    Map<String, dynamic> pool,
+    PendingTopup? pendingTopup,
+    String? serverMessage,
+  ) {
+    if (pendingTopup != null) return;
+    if (pool['success'] == false || pool['ok'] == false) {
+      throw ApiException(
+        serverMessage ?? 'Delivery did not complete on the network.',
+      );
+    }
+    final statusText =
+        (stringField(pool, const [
+                  'status',
+                  'Status',
+                  'state',
+                  'result',
+                  'transactionStatus',
+                  'responseStatus',
+                ]) ??
+                '')
+            .toUpperCase();
+    const failureTokens = [
+      'FAIL',
+      'ERROR',
+      'DECLIN',
+      'REJECT',
+      'CANCEL',
+      'UNSUCCESSFUL',
+      'INVALID',
+    ];
+    if (failureTokens.any(statusText.contains)) {
+      throw ApiException(
+        serverMessage ?? 'Delivery failed ($statusText).',
+      );
+    }
+
+    final rawCode = stringField(pool, const [
+      'status-code',
+      'statusCode',
+      'responseCode',
+      'errorCode',
+    ]);
+    final numericCode = rawCode == null ? null : int.tryParse(rawCode.trim());
+    if (numericCode != null &&
+        numericCode != 0 &&
+        numericCode != 200 &&
+        numericCode != 201 &&
+        numericCode != 202) {
+      throw ApiException(
+        serverMessage ?? 'Delivery failed (code $rawCode).',
+        statusCode: numericCode,
+      );
+    }
+
+    final errorField = stringField(pool, const ['error', 'err']);
+    if (errorField != null && errorField.isNotEmpty) {
+      throw ApiException(serverMessage ?? errorField);
+    }
+
+    final lowerMsg = (serverMessage ?? '').toLowerCase();
+    const messageFailures = [
+      'network check failed',
+      'failed locally',
+      'transaction failed',
+      'top-up failed',
+      'topup failed',
+      'insufficient balance',
+    ];
+    if (messageFailures.any(lowerMsg.contains)) {
+      throw ApiException(serverMessage!);
+    }
+  }
+
+  /// Provider success strings can embed the *merchant's* own balance
+  /// ("…you were charged GHS 1.00 and your current balance is GHS
+  /// 820.50"). That number is our float, not the customer's — it must
+  /// never reach a customer receipt, so balance clauses are stripped
+  /// while the rest of the message is kept.
+  static String _cleanReceiptMessage(String message) {
+    final out = message
+        .replaceAll(
+          RegExp(
+            r'(?:,|\.|;|\band\b|\bso\b)?\s*'
+            r'(?:your\s+|the\s+)?'
+            r'(?:current|new|remaining|available|wallet|account)?\s*'
+            r'balance\s*(?:is|was|:)\s*'
+            r'(?:[A-Z]{2,5}\s*)?\d[\d,]*(?:\.\d+)?',
+            caseSensitive: false,
+          ),
+          '',
+        )
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .replaceAll(RegExp(r'[\s,.;:]+$'), '')
+        .trim();
+    return out.isEmpty ? message : out;
   }
 
   /// The backend parks delivery when a registered recipient must choose

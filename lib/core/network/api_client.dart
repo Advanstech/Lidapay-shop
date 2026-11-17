@@ -233,9 +233,14 @@ class ApiClient {
           },
         },
       );
-      final data = res.data ?? const <String, dynamic>{};
-      final access = (data['access_token'] ?? '').toString();
-      final next = (data['refresh_token'] ?? '').toString();
+      final raw = res.data ?? const <String, dynamic>{};
+      final data = raw['data'] is Map
+          ? Map<String, dynamic>.from(raw['data'] as Map)
+          : raw;
+      final access =
+          (data['access_token'] ?? data['accessToken'] ?? '').toString();
+      final next =
+          (data['refresh_token'] ?? data['refreshToken'] ?? '').toString();
       if (access.isEmpty) {
         await tokenStore.clear(clearBiometric: true);
         return null;

@@ -41,10 +41,12 @@ class _RecipientDecisionScreenState
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      ref.read(readNotificationsProvider.notifier).markRead(
-        'decision_${widget.decisionId}',
-        relatedKeys: ['decision|${widget.decisionId}'],
-      );
+      ref
+          .read(readNotificationsProvider.notifier)
+          .markRead(
+            'decision_${widget.decisionId}',
+            relatedKeys: ['decision|${widget.decisionId}'],
+          );
     });
   }
 
@@ -379,17 +381,20 @@ class _CountdownCard extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.timer_outlined, size: 20, color: color),
-          const SizedBox(width: 8),
-          Text(
-            expired
-                ? 'Response window closed'
-                : submitting
-                ? 'Processing your choice'
-                : 'Choose within $mm:$ss — then it defaults to Lida Value',
-            style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.w700,
-              fontSize: 13.5,
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              expired
+                  ? 'Response window closed'
+                  : submitting
+                  ? 'Processing your choice'
+                  : 'Choose within $mm:$ss — then it defaults to Lida Value',
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.w700,
+                fontSize: 13.5,
+                height: 1.35,
+              ),
             ),
           ),
         ],

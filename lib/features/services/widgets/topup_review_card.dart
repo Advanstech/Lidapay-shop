@@ -246,9 +246,7 @@ class _TopupReviewCardState extends State<TopupReviewCard> {
               child: Row(
                 children: [
                   Icon(
-                    widget.isSelf
-                        ? Icons.person_rounded
-                        : Icons.send_rounded,
+                    widget.isSelf ? Icons.person_rounded : Icons.send_rounded,
                     size: 21,
                     color: AppColors.primary,
                   ),
@@ -397,23 +395,6 @@ class _TopupReviewCardState extends State<TopupReviewCard> {
                     onEdit: widget.onChangeRecipient,
                   ),
                   divider,
-                  _DetailRow(
-                    icon: Icons.bolt_rounded,
-                    iconColor: const Color(0xFF33B457),
-                    label: 'Delivery',
-                    value: widget.deliveryNote,
-                    valueIsSentence: true,
-                  ),
-                  if (widget.payWith != null) ...[
-                    divider,
-                    _DetailRow(
-                      icon: Icons.account_balance_wallet_outlined,
-                      iconColor: const Color(0xFF8A8299),
-                      label: 'Payment',
-                      value: widget.payWith!,
-                      trailing: widget.payAmount,
-                    ),
-                  ],
                 ],
               ),
             ),
@@ -422,6 +403,86 @@ class _TopupReviewCardState extends State<TopupReviewCard> {
                 : CrossFadeState.showFirst,
             duration: const Duration(milliseconds: 220),
             sizeCurve: Curves.easeOut,
+          ),
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.fromLTRB(14, 4, 14, 14),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: scheme.primaryContainer.withValues(alpha: 0.42),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.verified_outlined,
+                      size: 19,
+                      color: scheme.primary,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        widget.deliveryNote,
+                        style: TextStyle(
+                          color: scheme.onSurfaceVariant,
+                          fontSize: 12.5,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (widget.payWith != null) ...[
+                  const SizedBox(height: 12),
+                  LayoutBuilder(
+                    builder: (context, constraints) => Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Payment method',
+                                style: TextStyle(
+                                  color: scheme.onSurfaceVariant,
+                                  fontSize: 11.5,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                widget.payWith!,
+                                style: TextStyle(
+                                  color: scheme.onSurface,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxWidth: constraints.maxWidth * 0.48,
+                          ),
+                          child: Text(
+                            widget.payAmount ?? widget.heroValue,
+                            textAlign: TextAlign.end,
+                            style: TextStyle(
+                              color: scheme.primary,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
         ],
       ),
@@ -439,8 +500,6 @@ class _DetailRow extends StatelessWidget {
     required this.label,
     required this.value,
     this.onEdit,
-    this.trailing,
-    this.valueIsSentence = false,
   });
 
   final IconData icon;
@@ -449,8 +508,6 @@ class _DetailRow extends StatelessWidget {
   final String label;
   final String value;
   final VoidCallback? onEdit;
-  final String? trailing;
-  final bool valueIsSentence;
 
   @override
   Widget build(BuildContext context) {
@@ -487,25 +544,12 @@ class _DetailRow extends StatelessWidget {
                 Text(
                   value,
                   style: TextStyle(
-                    fontSize: valueIsSentence ? 14.5 : 16,
-                    fontWeight: valueIsSentence
-                        ? FontWeight.w600
-                        : FontWeight.w800,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
                     height: 1.3,
                     color: scheme.onSurface,
                   ),
                 ),
-                if (trailing != null) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    trailing!,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: scheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
               ],
             ),
           ),

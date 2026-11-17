@@ -36,20 +36,40 @@ class RemoteHistoryRepository implements HistoryRepository {
     int pageSize = 10,
     HistoryFilter? filter,
   }) async {
-    final feed = await ActivityFeed(
+    // One extra row beyond the page acts as the has-more signal, so an
+    // exactly-full final page no longer reads as "more to fetch".
+    final needed = page * pageSize + 1;
+    var ledgerLimit = page * pageSize + 50;
+    var feed = await ActivityFeed(
       _api,
       _userId ?? '',
-    ).fetch(ledgerLimit: page * pageSize + 50);
+    ).fetch(ledgerLimit: ledgerLimit);
     var items = feed;
     if (filter != null && filter.isActive) {
       items = items.where(filter.matches).toList();
     }
+    // Sparse matches under a filter can sit beyond the fetched window;
+    // grow the ledger (bounded) until page+sentinel fills or the merged
+    // feed stops growing.
+    while (items.length < needed &&
+        feed.length >= ledgerLimit &&
+        ledgerLimit < 500) {
+      ledgerLimit += 100;
+      final next = await ActivityFeed(
+        _api,
+        _userId ?? '',
+      ).fetch(ledgerLimit: ledgerLimit);
+      if (next.length <= feed.length) break;
+      feed = next;
+      items = feed;
+      if (filter != null && filter.isActive) {
+        items = items.where(filter.matches).toList();
+      }
+    }
     final start = (page - 1) * pageSize;
     if (start >= items.length) return const [];
-    final end = start + pageSize > items.length
-        ? items.length
-        : start + pageSize;
-    return items.sublist(start, end);
+    final end = start + pageSize + 1;
+    return items.sublist(start, end > items.length ? items.length : end);
   }
 
   @override

@@ -123,9 +123,6 @@ class HistoryScreen extends ConsumerWidget {
             onRefresh: () => _refresh(ref),
             edgeOffset: topInset + 72,
             child: CustomScrollView(
-              physics: const BouncingScrollPhysics(
-                parent: AlwaysScrollableScrollPhysics(),
-              ),
               slivers: [
                 SliverPersistentHeader(
                   pinned: true,
@@ -133,16 +130,14 @@ class HistoryScreen extends ConsumerWidget {
                     height: topInset + 68,
                     builder: (context, isStuck) => DecoratedBox(
                       decoration: BoxDecoration(
-                        gradient: AppColors.heroGradient,
-                        boxShadow: isStuck
-                            ? [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.22),
-                                  blurRadius: 14,
-                                  offset: const Offset(0, 6),
-                                ),
-                              ]
-                            : null,
+                        color: scaffoldBg,
+                        border: Border(
+                          bottom: BorderSide(
+                            color: isStuck
+                                ? Theme.of(context).colorScheme.outlineVariant
+                                : Colors.transparent,
+                          ),
+                        ),
                       ),
                       child: Padding(
                         padding: EdgeInsets.fromLTRB(20, topInset + 10, 20, 10),
@@ -334,45 +329,42 @@ class _ActivityTopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Row(
       children: [
-        GestureDetector(
-          onTap: onBack,
-          child: Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.18),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            alignment: Alignment.center,
-            child: const Icon(
-              Icons.arrow_back_rounded,
-              color: Colors.white,
-              size: 22,
-            ),
-          ),
+        IconButton.filledTonal(
+          onPressed: onBack,
+          tooltip: 'Back',
+          icon: const Icon(Icons.arrow_back_rounded),
         ),
-        const SizedBox(width: 14),
-        const Expanded(
-          child: Text(
-            'Activity',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 23,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.3,
-            ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'History',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: scheme.onSurface,
+                  fontSize: 23,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.3,
+                ),
+              ),
+              Text(
+                'Every transaction, in one place',
+                style: TextStyle(
+                  color: scheme.onSurfaceVariant,
+                  fontSize: 11.5,
+                ),
+              ),
+            ],
           ),
         ),
         IconButton(
           onPressed: onAnalytics,
           tooltip: 'Insights',
-          icon: const Icon(
-            Icons.assessment_outlined,
-            color: Colors.white,
-            size: 22,
-          ),
+          icon: Icon(Icons.assessment_outlined, color: scheme.onSurface),
         ),
         IconButton(
           onPressed: onFilter,
@@ -380,12 +372,8 @@ class _ActivityTopBar extends StatelessWidget {
           icon: Badge(
             isLabelVisible: filterActive,
             smallSize: 8,
-            backgroundColor: const Color(0xFFFFB84D),
-            child: const Icon(
-              Icons.filter_list_rounded,
-              color: Colors.white,
-              size: 22,
-            ),
+            backgroundColor: AppColors.warning,
+            child: Icon(Icons.filter_list_rounded, color: scheme.onSurface),
           ),
         ),
       ],
@@ -406,18 +394,16 @@ class _ActivityHeroStats extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(20, 6, 20, 20),
-      decoration: const BoxDecoration(gradient: AppColors.heroGradient),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 10, 20, 12),
       child: Row(
         children: [
           Expanded(
             child: _SummaryStatPill(
               icon: Icons.south_west_rounded,
-              iconColor: const Color(0xFF4CD97B),
+              iconColor: AppColors.success,
               label: 'Money In',
-              labelColor: const Color(0xFF4CD97B),
+              labelColor: AppColors.success,
               value: 'GHS ${moneyIn.toStringAsFixed(2)}',
             ),
           ),
@@ -425,9 +411,9 @@ class _ActivityHeroStats extends StatelessWidget {
           Expanded(
             child: _SummaryStatPill(
               icon: Icons.north_east_rounded,
-              iconColor: const Color(0xFFF6A7C1),
+              iconColor: AppColors.primary,
               label: 'Money Out',
-              labelColor: const Color(0xFFF6A7C1),
+              labelColor: AppColors.primary,
               value: 'GHS ${moneyOut.toStringAsFixed(2)}',
             ),
           ),
@@ -435,9 +421,9 @@ class _ActivityHeroStats extends StatelessWidget {
           Expanded(
             child: _SummaryStatPill(
               icon: Icons.access_time_rounded,
-              iconColor: Colors.white,
+              iconColor: AppColors.warning,
               label: 'Pending',
-              labelColor: Colors.white,
+              labelColor: AppColors.warning,
               value: '$pendingCount',
             ),
           ),
@@ -464,12 +450,13 @@ class _SummaryStatPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: scheme.outlineVariant),
       ),
       child: Column(
         children: [
@@ -498,8 +485,8 @@ class _SummaryStatPill extends StatelessWidget {
             fit: BoxFit.scaleDown,
             child: Text(
               value,
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: scheme.onSurface,
                 fontSize: 14.5,
                 fontWeight: FontWeight.w800,
               ),

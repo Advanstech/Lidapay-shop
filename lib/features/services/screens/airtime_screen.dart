@@ -249,8 +249,9 @@ class _AirtimeScreenState extends ConsumerState<AirtimeScreen>
     if (!mounted || detail?.dialCode == null) return;
     if (_selectedCountry.isoCode != country.isoCode) return;
     setState(
-      () => _selectedCountry =
-          _selectedCountry.copyWithDialCode(detail!.dialCode!),
+      () => _selectedCountry = _selectedCountry.copyWithDialCode(
+        detail!.dialCode!,
+      ),
     );
   }
 
@@ -475,9 +476,8 @@ class _AirtimeScreenState extends ConsumerState<AirtimeScreen>
   /// Ghana tops up in cedis; Reloadly destinations quote in USD (or the
   /// operator's sender currency) and convert to the destination country's
   /// currency via `fx`.
-  String get _amountCurrency => _isGhana
-      ? 'GHS'
-      : (_detectedOperator?.senderCurrencyCode ?? 'USD');
+  String get _amountCurrency =>
+      _isGhana ? 'GHS' : (_detectedOperator?.senderCurrencyCode ?? 'USD');
 
   String _priceLabel(double value) => _isGhana
       ? Formatters.currency(value)
@@ -487,8 +487,13 @@ class _AirtimeScreenState extends ConsumerState<AirtimeScreen>
       ? 'GH₵ ${value.toStringAsFixed(0)}'
       : '$_amountCurrency ${value.toStringAsFixed(0)}';
 
-  bool get _hasValidPhone =>
-      _phone.text.replaceAll(RegExp(r'\D'), '').length >= 9;
+  bool get _hasValidPhone {
+    if (_isGhana) {
+      final local = _digits;
+      return local.length == 10 && local.startsWith('0');
+    }
+    return _phone.text.replaceAll(RegExp(r'\D'), '').length >= 9;
+  }
 
   /// Ghana requires an explicitly confirmed Prymo network (autodetect
   /// preselects, the user confirms — ported numbers may differ). Reloadly
@@ -686,7 +691,8 @@ class _AirtimeScreenState extends ConsumerState<AirtimeScreen>
   /// "Auto detect" that has since resolved) must be in place. Reloadly
   /// destinations always carry a pick because "Auto detect" is preselected —
   /// the step can never dead-end on a catalogue that failed to load.
-  bool get _networkReady => _isGhana ? _ghanaChoice != null : _networkId != null;
+  bool get _networkReady =>
+      _isGhana ? _ghanaChoice != null : _networkId != null;
 
   bool get _canAdvanceStep => switch (_step) {
     1 => true,
@@ -843,9 +849,11 @@ class _AirtimeScreenState extends ConsumerState<AirtimeScreen>
     final orderDesc =
         'Lidapay airtime top-up $_amountCurrency '
         '${_amountValue.toStringAsFixed(2)} for $recipientDigits';
+    final clientReference = newClientReference();
     final draft = _isGhana
         ? PendingPayment.ghanaAirtime(
             reference: newPaymentReference(),
+            clientReference: clientReference,
             amount: _amountValue,
             recipientNumber: recipientDigits,
             networkId: _networkId!,
@@ -855,6 +863,7 @@ class _AirtimeScreenState extends ConsumerState<AirtimeScreen>
           )
         : PendingPayment.globalAirtime(
             reference: newPaymentReference(),
+            clientReference: clientReference,
             // Charged exactly as Reloadly quotes it (sender currency, e.g.
             // USD) — the fx rate only describes what the recipient receives.
             payAmount: _amountValue,
@@ -1594,14 +1603,17 @@ class _AirtimeScreenState extends ConsumerState<AirtimeScreen>
   ) {
     final scheme = Theme.of(context).colorScheme;
     final detected = _detectedNetwork(networks);
-    final countries = _mergedCountries(ref.watch(countriesProvider).valueOrNull);
+    final countries = _mergedCountries(
+      ref.watch(countriesProvider).valueOrNull,
+    );
     final rawUserDigits = userPhone.replaceAll(RegExp(r'\D'), '');
     final dialDigits = _selectedCountry.dialCode.replaceAll(RegExp(r'\D'), '');
-    final isMyNumberForSelectedCountry = rawUserDigits.isNotEmpty &&
+    final isMyNumberForSelectedCountry =
+        rawUserDigits.isNotEmpty &&
         (_isGhana
             ? (rawUserDigits.startsWith('233') ||
-                rawUserDigits.length == 9 ||
-                rawUserDigits.length == 10)
+                  rawUserDigits.length == 9 ||
+                  rawUserDigits.length == 10)
             : (dialDigits.isNotEmpty && rawUserDigits.startsWith(dialDigits)));
 
     return Column(
@@ -1719,10 +1731,10 @@ class _AirtimeScreenState extends ConsumerState<AirtimeScreen>
                             isoCode: _selectedCountry.isoCode,
                             onInternationalPaste: (raw) =>
                                 _onInternationalNumberPasted(
-                              raw,
-                              networks,
-                              countries,
-                            ),
+                                  raw,
+                                  networks,
+                                  countries,
+                                ),
                           ),
                         ],
                         style: TextStyle(
@@ -2036,7 +2048,8 @@ class _AirtimeScreenState extends ConsumerState<AirtimeScreen>
                     color: AppColors.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Text(_globalPayBanner,
+                  child: Text(
+                    _globalPayBanner,
                     style: const TextStyle(
                       fontSize: 12.5,
                       fontWeight: FontWeight.w700,
@@ -2105,8 +2118,10 @@ class _AirtimeScreenState extends ConsumerState<AirtimeScreen>
                 onTap: () => setState(() => _showAllPresets = !_showAllPresets),
                 behavior: HitTestBehavior.opaque,
                 child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 4,
+                    horizontal: 2,
+                  ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -2143,7 +2158,7 @@ class _AirtimeScreenState extends ConsumerState<AirtimeScreen>
             const itemHeight = 48.0;
             final itemWidth =
                 (constraints.maxWidth - (crossAxisCount - 1) * spacing) /
-                    crossAxisCount;
+                crossAxisCount;
             final aspectRatio = itemWidth / itemHeight;
 
             return GridView.builder(
@@ -2160,9 +2175,8 @@ class _AirtimeScreenState extends ConsumerState<AirtimeScreen>
                 final value = displayedPresets[index];
                 final selected = _amountValue == value;
                 return GestureDetector(
-                  onTap: () => setState(
-                    () => _amount.text = value.toStringAsFixed(0),
-                  ),
+                  onTap: () =>
+                      setState(() => _amount.text = value.toStringAsFixed(0)),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 160),
                     alignment: Alignment.center,
@@ -2174,8 +2188,8 @@ class _AirtimeScreenState extends ConsumerState<AirtimeScreen>
                         color: selected
                             ? AppColors.primary
                             : (isDark
-                                ? Colors.white12
-                                : const Color(0xFFE5E3EC)),
+                                  ? Colors.white12
+                                  : const Color(0xFFE5E3EC)),
                         width: selected ? 1.5 : 1,
                       ),
                     ),
@@ -2202,10 +2216,7 @@ class _AirtimeScreenState extends ConsumerState<AirtimeScreen>
             onTap: () => setState(() => _showAllPresets = !_showAllPresets),
             child: Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 18,
-                vertical: 13,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
               decoration: BoxDecoration(
                 color: cardBg,
                 borderRadius: BorderRadius.circular(14),
@@ -2252,7 +2263,8 @@ class _AirtimeScreenState extends ConsumerState<AirtimeScreen>
       (n) => n.id == _networkId,
       orElse: () => ServiceOption(
         id: 'auto',
-        name: _detectedOperator?.name ?? (_isGhana ? 'MTN Ghana' : 'Auto-detect'),
+        name:
+            _detectedOperator?.name ?? (_isGhana ? 'MTN Ghana' : 'Auto-detect'),
       ),
     );
     final fxPaid = !_isGhana && _amountValue > 0
@@ -2284,8 +2296,7 @@ class _AirtimeScreenState extends ConsumerState<AirtimeScreen>
           deliveryNote: isSelf
               ? 'Delivered instantly to your line once payment is confirmed.'
               : 'Recipient can take the airtime now or save it as Lida Value.',
-          payWith:
-              _funding.isLidaValue ? null : 'MoMo or Card · choose next',
+          payWith: _funding.isLidaValue ? null : 'MoMo or Card · choose next',
           payAmount: fxPaid == null
               ? null
               : '$_amountCurrency ${_amountValue.toStringAsFixed(2)} · '
@@ -2686,7 +2697,11 @@ class _CountryTile extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
               ),
               alignment: Alignment.center,
-              child: CountryFlagBadge(isoCode: country.isoCode, flagUrl: country.flagUrl, size: 34),
+              child: CountryFlagBadge(
+                isoCode: country.isoCode,
+                flagUrl: country.flagUrl,
+                size: 34,
+              ),
             ),
             const SizedBox(width: 14),
             Expanded(

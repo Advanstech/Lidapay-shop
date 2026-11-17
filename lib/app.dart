@@ -66,7 +66,12 @@ class _LidapayAppState extends ConsumerState<LidapayApp>
     final router = ref.read(routerProvider);
 
     // Initialize Push & Local Notifications with the GoRouter instance
-    ref.read(pushNotificationServiceProvider).initialize(router: router);
+    ref
+        .read(pushNotificationServiceProvider)
+        .initialize(
+          router: router,
+          hasSession: () => ref.read(hasSessionProvider),
+        );
 
     // AppLinks streams `lidapay://` payment returns for the lifetime of the
     // app; URIs that arrive before a session exists are parked until
@@ -76,7 +81,10 @@ class _LidapayAppState extends ConsumerState<LidapayApp>
       hasSession: () => ref.read(hasSessionProvider),
     );
     _deepLinks!.start();
-    ref.listenManual(hasSessionProvider, (_, _) => _deepLinks?.flush());
+    ref.listenManual(hasSessionProvider, (_, _) {
+      _deepLinks?.flush();
+      ref.read(pushNotificationServiceProvider).flushPendingNavigation(router);
+    });
   }
 
   @override

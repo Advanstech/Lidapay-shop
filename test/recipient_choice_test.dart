@@ -103,6 +103,7 @@ class _RecordingLidaServices extends MockServicesRepository {
     required double amount,
     required String networkId,
     required bool saveToLidaValue,
+    required String clientReference,
     bool isSelfTopup = false,
   }) async {
     calls.add('deliver:$recipientNumber:$amount:$networkId:$isSelfTopup');
@@ -130,6 +131,7 @@ class _FailingDeliveryServices extends _RecordingLidaServices {
     required double amount,
     required String networkId,
     required bool saveToLidaValue,
+    required String clientReference,
     bool isSelfTopup = false,
   }) async {
     calls.add('deliver-failed');
@@ -328,6 +330,7 @@ void main() {
         amount: 10,
         networkId: '4',
         saveToLidaValue: false,
+        clientReference: 'LDP-test-rc-1',
       );
       expect(receipt.pendingTopup, isNotNull);
       expect(receipt.pendingTopup!.topupOrderId, 'TRX9');
@@ -348,6 +351,7 @@ void main() {
         amount: 10,
         networkId: '4',
         saveToLidaValue: false,
+        clientReference: 'LDP-test-rc-2',
       );
       expect(receipt.pendingTopup, isNull);
     });
@@ -358,6 +362,7 @@ void main() {
       final services = _RecordingLidaServices();
       final draft = PendingPayment.ghanaData(
         reference: 'LDP-1',
+        clientReference: 'LDP-test-rc-3',
         amount: 12,
         recipientNumber: '0244588584',
         networkId: '4',
@@ -379,6 +384,7 @@ void main() {
       final services = _RecordingLidaServices();
       final draft = PendingPayment.shopOrder(
         reference: 'LDP-2',
+        clientReference: 'LDP-test-rc-4',
         orderId: 'ORD1',
         orderNumber: 'SH-1',
         total: 40,
@@ -397,6 +403,7 @@ void main() {
       final notifier = LidaValueTopupNotifier(services);
       final draft = PendingPayment.ghanaAirtime(
         reference: 'LDP-3',
+        clientReference: 'LDP-test-rc-5',
         amount: 10,
         recipientNumber: '0244588584',
         networkId: '4',
@@ -419,6 +426,7 @@ void main() {
       final notifier = LidaValueTopupNotifier(services);
       final draft = PendingPayment.ghanaAirtime(
         reference: 'LDP-4',
+        clientReference: 'LDP-test-rc-6',
         amount: 15,
         recipientNumber: '0201234567',
         networkId: '6',
@@ -441,6 +449,7 @@ void main() {
       final notifier = LidaValueTopupNotifier(services);
       final draft = PendingPayment.ghanaAirtime(
         reference: 'LDP-5',
+        clientReference: 'LDP-test-rc-7',
         amount: 10,
         recipientNumber: '0244588584',
         networkId: '4',
@@ -463,6 +472,7 @@ void main() {
       final notifier = LidaValueTopupNotifier(services);
       final draft = PendingPayment.ghanaAirtime(
         reference: 'LDP-6',
+        clientReference: 'LDP-test-rc-8',
         amount: 10,
         recipientNumber: '0201234567',
         networkId: '4',

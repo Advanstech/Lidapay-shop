@@ -84,9 +84,6 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
         onRefresh: () async => ref.refresh(userOrdersProvider.future),
         edgeOffset: MediaQuery.paddingOf(context).top + 110,
         child: CustomScrollView(
-          physics: const BouncingScrollPhysics(
-            parent: AlwaysScrollableScrollPhysics(),
-          ),
           slivers: [
             SliverToBoxAdapter(
               child: _OrdersHero(
@@ -120,9 +117,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
               (false, false, final list) when list!.isEmpty =>
                 SliverFillRemaining(
                   hasScrollBody: false,
-                  child: _EmptyOrders(
-                    onExplore: () => context.go('/shop'),
-                  ),
+                  child: _EmptyOrders(onExplore: () => context.go('/shop')),
                 ),
               (false, false, final list) => SliverPadding(
                 padding: EdgeInsets.fromLTRB(
@@ -305,11 +300,7 @@ class _OrderCard extends ConsumerWidget {
         Icons.inventory_2_rounded,
         'Processing',
       ),
-      'cancelled' => (
-        scheme.error,
-        Icons.cancel_rounded,
-        'Cancelled',
-      ),
+      'cancelled' => (scheme.error, Icons.cancel_rounded, 'Cancelled'),
       _ => (scheme.onSurfaceVariant, Icons.schedule_rounded, 'Pending'),
     };
 
@@ -567,7 +558,9 @@ class _OrderDetailSheet extends ConsumerWidget {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               ConstrainedBox(
-                                constraints: const BoxConstraints(maxWidth: 150),
+                                constraints: const BoxConstraints(
+                                  maxWidth: 150,
+                                ),
                                 child: Text(
                                   '${order.carrier != null ? '${order.carrier} · ' : ''}${order.trackingNumber}',
                                   maxLines: 1,
@@ -892,7 +885,8 @@ class _StatusPill extends StatelessWidget {
     final scheme = theme.colorScheme;
     final normalized = status.toLowerCase();
     final (label, color) =
-        _labels[normalized] ?? (normalized.isEmpty ? 'Placed' : normalized, scheme.onSurfaceVariant);
+        _labels[normalized] ??
+        (normalized.isEmpty ? 'Placed' : normalized, scheme.onSurfaceVariant);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
@@ -984,10 +978,7 @@ class _TrackingEventRow extends StatelessWidget {
                   if (time.isNotEmpty)
                     Text(
                       time,
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        color: scheme.outline,
-                      ),
+                      style: TextStyle(fontSize: 11.5, color: scheme.outline),
                     ),
                 ],
               ),

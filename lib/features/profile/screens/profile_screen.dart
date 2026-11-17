@@ -116,9 +116,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 const SizedBox(height: 16),
                 Text(
                   'Delete your account?',
-                  style: text.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
+                  style: text.titleLarge?.copyWith(fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: 10),
                 Text(
@@ -306,9 +304,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         onRefresh: _refresh,
         edgeOffset: topInset + 76,
         child: CustomScrollView(
-          physics: const BouncingScrollPhysics(
-            parent: AlwaysScrollableScrollPhysics(),
-          ),
           slivers: [
             SliverPersistentHeader(
               pinned: true,
@@ -1050,8 +1045,7 @@ class _ContactStatusChip extends ConsumerStatefulWidget {
   final _ContactKind kind;
 
   @override
-  ConsumerState<_ContactStatusChip> createState() =>
-      _ContactStatusChipState();
+  ConsumerState<_ContactStatusChip> createState() => _ContactStatusChipState();
 }
 
 class _ContactStatusChipState extends ConsumerState<_ContactStatusChip> {
@@ -1059,9 +1053,8 @@ class _ContactStatusChipState extends ConsumerState<_ContactStatusChip> {
 
   void _snack(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _verifyEmail() async {
@@ -1140,8 +1133,9 @@ class _ContactStatusChipState extends ConsumerState<_ContactStatusChip> {
                   ? null
                   : () async {
                       setDialogState(() => submitting = true);
-                      final ok =
-                          await _submitPhoneCode(codeController.text.trim());
+                      final ok = await _submitPhoneCode(
+                        codeController.text.trim(),
+                      );
                       setDialogState(() => submitting = false);
                       if (ok && ctx.mounted) Navigator.of(ctx).pop(true);
                     },
@@ -1180,14 +1174,15 @@ class _ContactStatusChipState extends ConsumerState<_ContactStatusChip> {
 
   @override
   Widget build(BuildContext context) {
-    final fg =
-        widget.verified ? const Color(0xFF6BF097) : const Color(0xFFFFD479);
+    final fg = widget.verified
+        ? const Color(0xFF6BF097)
+        : const Color(0xFFFFD479);
     return GestureDetector(
       onTap: widget.verified || _busy
           ? null
           : widget.kind == _ContactKind.email
-              ? _verifyEmail
-              : _verifyPhone,
+          ? _verifyEmail
+          : _verifyPhone,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
         decoration: BoxDecoration(
@@ -1611,10 +1606,7 @@ class _KycProgressCard extends ConsumerWidget {
       ),
       // Phone verification stays status-only here — the SMS code flow is
       // deferred to the One4All SMS implementation.
-      _KycItem(
-        label: 'Phone verified',
-        done: u?.phoneVerified == true,
-      ),
+      _KycItem(label: 'Phone verified', done: u?.phoneVerified == true),
       _KycItem(
         label: 'Delivery address & GPS set',
         done: u?.hasDeliveryAddress == true,

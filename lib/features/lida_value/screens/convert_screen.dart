@@ -50,9 +50,7 @@ class _ConvertScreenState extends State<ConvertScreen> {
   double get _amountValue => double.tryParse(_amount.text.trim()) ?? 0;
 
   bool get _canConvert =>
-      _amountValue > 0 &&
-      _destination.text.trim().isNotEmpty &&
-      !_busy;
+      _amountValue > 0 && _destination.text.trim().isNotEmpty && !_busy;
 
   @override
   void dispose() {
@@ -69,14 +67,14 @@ class _ConvertScreenState extends State<ConvertScreen> {
       _receipt = null;
     });
     try {
-      final isEligible =
-          await ref.read(servicesRepositoryProvider).checkLidaValueEligibility();
+      final isEligible = await ref
+          .read(servicesRepositoryProvider)
+          .checkLidaValueEligibility();
       if (!isEligible) {
         if (!mounted) return;
         setState(() {
           _busy = false;
-          _error =
-              'Your account is not currently eligible for conversion. Please contact support.';
+          _error = 'Your account is not currently eligible for conversion. Please contact support.';
         });
         return;
       }
@@ -112,9 +110,6 @@ class _ConvertScreenState extends State<ConvertScreen> {
 
         return Scaffold(
           body: CustomScrollView(
-            physics: const BouncingScrollPhysics(
-              parent: AlwaysScrollableScrollPhysics(),
-            ),
             slivers: [
               SliverPersistentHeader(
                 pinned: true,
@@ -216,8 +211,7 @@ class _ConvertScreenState extends State<ConvertScreen> {
                             ),
                             const SizedBox(height: 8),
                             Row(
-                              crossAxisAlignment:
-                                  CrossAxisAlignment.baseline,
+                              crossAxisAlignment: CrossAxisAlignment.baseline,
                               textBaseline: TextBaseline.alphabetic,
                               children: [
                                 Text(
@@ -265,8 +259,9 @@ class _ConvertScreenState extends State<ConvertScreen> {
                       const SizedBox(height: 10),
                       TextField(
                         controller: _amount,
-                        keyboardType:
-                            const TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
                         onChanged: (_) => setState(() {}),
                         style: const TextStyle(
                           fontSize: 20,
@@ -301,28 +296,30 @@ class _ConvertScreenState extends State<ConvertScreen> {
                           Expanded(
                             child: _DestinationTypeCard(
                               type: _ConvertDestination.momo,
-                              selected: _destinationType ==
-                                  _ConvertDestination.momo,
+                              selected:
+                                  _destinationType == _ConvertDestination.momo,
                               label: 'Mobile Money',
                               subtitle: 'Send to a MoMo number',
                               icon: Icons.phone_android_rounded,
-                              onTap: () =>
-                                  setState(() => _destinationType =
-                                      _ConvertDestination.momo),
+                              onTap: () => setState(
+                                () =>
+                                    _destinationType = _ConvertDestination.momo,
+                              ),
                             ),
                           ),
                           const SizedBox(width: 10),
                           Expanded(
                             child: _DestinationTypeCard(
                               type: _ConvertDestination.bank,
-                              selected: _destinationType ==
-                                  _ConvertDestination.bank,
+                              selected:
+                                  _destinationType == _ConvertDestination.bank,
                               label: 'Bank Account',
                               subtitle: 'Send to a bank account',
                               icon: Icons.account_balance_wallet_rounded,
-                              onTap: () =>
-                                  setState(() => _destinationType =
-                                      _ConvertDestination.bank),
+                              onTap: () => setState(
+                                () =>
+                                    _destinationType = _ConvertDestination.bank,
+                              ),
                             ),
                           ),
                         ],
@@ -346,8 +343,8 @@ class _ConvertScreenState extends State<ConvertScreen> {
                           hintText: _destinationType == _ConvertDestination.momo
                               ? '0241234567'
                               : '1234567890',
-                          prefixText: _destinationType ==
-                                  _ConvertDestination.momo
+                          prefixText:
+                              _destinationType == _ConvertDestination.momo
                               ? 'momo:'
                               : 'bank:',
                           filled: true,
@@ -392,8 +389,7 @@ class _ConvertScreenState extends State<ConvertScreen> {
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
                                       'Conversion complete',
@@ -422,8 +418,8 @@ class _ConvertScreenState extends State<ConvertScreen> {
                         label: _busy
                             ? 'Converting…'
                             : _receipt != null
-                                ? 'Convert again'
-                                : 'Convert',
+                            ? 'Convert again'
+                            : 'Convert',
                         loading: _busy,
                         onPressed: _canConvert || _receipt != null
                             ? () => _convert(ref)
@@ -484,9 +480,7 @@ class _DestinationTypeCard extends StatelessWidget {
             border: Border.all(
               color: selected
                   ? AppColors.primary
-                  : (isDark
-                      ? Colors.white10
-                      : const Color(0xFFECEAF2)),
+                  : (isDark ? Colors.white10 : const Color(0xFFECEAF2)),
             ),
           ),
           child: Row(
@@ -498,15 +492,13 @@ class _DestinationTypeCard extends StatelessWidget {
                   color: selected
                       ? AppColors.primary
                       : (isDark
-                          ? AppColors.darkInput
-                          : const Color(0xFFF5F4FA)),
+                            ? AppColors.darkInput
+                            : const Color(0xFFF5F4FA)),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
                   icon,
-                  color: selected
-                      ? Colors.white
-                      : AppColors.primary,
+                  color: selected ? Colors.white : AppColors.primary,
                   size: 18,
                 ),
               ),
@@ -520,9 +512,7 @@ class _DestinationTypeCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w800,
-                        color: selected
-                            ? AppColors.primary
-                            : scheme.onSurface,
+                        color: selected ? AppColors.primary : scheme.onSurface,
                       ),
                     ),
                     const SizedBox(height: 2),

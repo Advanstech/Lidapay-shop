@@ -183,9 +183,6 @@ class _RedeemScreenState extends State<RedeemScreen> {
 
         return Scaffold(
           body: CustomScrollView(
-            physics: const BouncingScrollPhysics(
-              parent: AlwaysScrollableScrollPhysics(),
-            ),
             slivers: [
               SliverPersistentHeader(
                 pinned: true,
@@ -259,12 +256,7 @@ class _RedeemScreenState extends State<RedeemScreen> {
               ),
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    20,
-                    20,
-                    20,
-                    24 + bottomInset,
-                  ),
+                  padding: EdgeInsets.fromLTRB(20, 20, 20, 24 + bottomInset),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -312,7 +304,9 @@ class _RedeemScreenState extends State<RedeemScreen> {
                         TextField(
                           controller: _points,
                           keyboardType: TextInputType.number,
-                          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                          ],
                           onChanged: (_) {
                             if (_quote != null) setState(() => _quote = null);
                             setState(() {});
@@ -420,7 +414,9 @@ class _RedeemScreenState extends State<RedeemScreen> {
                             ),
                           ),
                           AppButton(
-                            label: _confirming ? 'Redeeming…' : 'Confirm redemption',
+                            label: _confirming
+                                ? 'Redeeming…'
+                                : 'Confirm redemption',
                             icon: const Icon(
                               Icons.redeem_rounded,
                               color: Colors.white,

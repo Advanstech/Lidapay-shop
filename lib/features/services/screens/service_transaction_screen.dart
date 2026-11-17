@@ -30,13 +30,7 @@ import '../widgets/service_receipt_screen.dart';
 import '../widgets/service_wizard_widgets.dart';
 import '../widgets/topup_review_card.dart';
 
-enum ServiceFlow {
-  airtime,
-  data,
-  globalAirtime,
-  qrPay,
-  gtPay,
-}
+enum ServiceFlow { airtime, data, globalAirtime, qrPay, gtPay }
 
 class ServiceTransactionScreen extends ConsumerStatefulWidget {
   const ServiceTransactionScreen({
@@ -96,8 +90,7 @@ class _ServiceTransactionScreenState
   };
 
   bool get _needsNetwork =>
-      widget.flow == ServiceFlow.airtime ||
-      widget.flow == ServiceFlow.data;
+      widget.flow == ServiceFlow.airtime || widget.flow == ServiceFlow.data;
   bool get _needsCountry => widget.flow == ServiceFlow.globalAirtime;
   bool get _needsService => widget.flow == ServiceFlow.gtPay;
 
@@ -148,6 +141,7 @@ class _ServiceTransactionScreenState
       return;
     }
     setState(() => _submitting = true);
+    final clientReference = newClientReference();
     final repo = ref.read(servicesRepositoryProvider);
     final amount = double.tryParse(_amount.text.trim()) ?? _bundle?.price ?? 0;
     try {
@@ -157,17 +151,20 @@ class _ServiceTransactionScreenState
           amount: amount,
           networkId: _network!,
           saveToLidaValue: false,
+          clientReference: clientReference,
         ),
         ServiceFlow.data => await repo.buyDataBundle(
           recipientNumber: _phone.text.trim(),
           networkId: _network!,
           bundle: _bundle!,
           saveToLidaValue: false,
+          clientReference: clientReference,
         ),
         ServiceFlow.globalAirtime => await repo.buyGlobalAirtime(
           recipientNumber: _phone.text.trim(),
           amount: amount,
           countryCode: _country!,
+          clientReference: clientReference,
         ),
         ServiceFlow.qrPay => await repo.payQr(
           merchantCode: _phone.text.trim(),
@@ -670,7 +667,6 @@ class _DataCountry {
   );
 }
 
-
 /// 5-step Enhanced Internet Data wizard (`Country` → `Network` → `Phone` →
 /// `Bundle` → `Confirm`) with the `Confirm Operating Network` sheet and
 /// `Available Bundles` plan cards.
@@ -903,8 +899,9 @@ class _EnhancedInternetDataWizardState
     if (!mounted || detail?.dialCode == null) return;
     if (_selectedCountry.isoCode != country.isoCode) return;
     setState(
-      () => _selectedCountry =
-          _selectedCountry.copyWithDialCode(detail!.dialCode!),
+      () => _selectedCountry = _selectedCountry.copyWithDialCode(
+        detail!.dialCode!,
+      ),
     );
   }
 
@@ -1018,8 +1015,13 @@ class _EnhancedInternetDataWizardState
     return null;
   }
 
-  bool get _hasValidPhone =>
-      _phone.text.replaceAll(RegExp(r'\D'), '').length >= 9;
+  bool get _hasValidPhone {
+    if (_isGhana) {
+      final local = _digits;
+      return local.length == 10 && local.startsWith('0');
+    }
+    return _phone.text.replaceAll(RegExp(r'\D'), '').length >= 9;
+  }
 
   /// Ghana requires a Prymo bundle; Reloadly data sells by amount, so step 4
   /// is the bundle grid for GH and an amount entry for every other country.
@@ -1088,10 +1090,7 @@ class _EnhancedInternetDataWizardState
     _onPhoneChanged(networks);
   }
 
-  void _onInternationalNumberPasted(
-    String raw,
-    List<ServiceOption> networks,
-  ) {
+  void _onInternationalNumberPasted(String raw, List<ServiceOption> networks) {
     final clean = raw.startsWith('00')
         ? raw.substring(2)
         : (raw.startsWith('+') ? raw.substring(1) : raw);
@@ -1332,9 +1331,11 @@ class _EnhancedInternetDataWizardState
         ? 'Lidapay data bundle ${bundle?.name ?? ''} for $recipientDigits'
         : 'Lidapay data top-up $_globalAmountCurrency '
               '${_amountValue.toStringAsFixed(2)} for $recipientDigits';
+    final clientReference = newClientReference();
     final draft = _isGhana
         ? PendingPayment.ghanaData(
             reference: newPaymentReference(),
+            clientReference: clientReference,
             amount: bundle?.price ?? 0,
             recipientNumber: recipientDigits,
             networkId: _networkId!,
@@ -1347,6 +1348,7 @@ class _EnhancedInternetDataWizardState
           )
         : PendingPayment.globalData(
             reference: newPaymentReference(),
+            clientReference: clientReference,
             // Charged exactly as Reloadly quotes it (sender currency, e.g.
             // USD) — the fx rate only describes what the recipient receives.
             payAmount: _amountValue,
@@ -1539,7 +1541,8 @@ class _EnhancedInternetDataWizardState
           SliverPersistentHeader(
             pinned: true,
             delegate: _PinnedDataHeaderDelegate(
-              height: MediaQuery.paddingOf(context).top + (_step == 5 ? 78 : 96),
+              height:
+                  MediaQuery.paddingOf(context).top + (_step == 5 ? 78 : 96),
               title: _step == 5 ? 'Buy Data' : 'Enhanced Internet\nData',
               onBack: () => Navigator.of(context).pop(),
             ),
@@ -1593,12 +1596,7 @@ class _EnhancedInternetDataWizardState
                     )
                   : switch (_step) {
                       2 => _buildNetworkStep(networks),
-                      3 => _buildPhoneStep(
-                        networks,
-                        userPhone,
-                        isDark,
-                        cardBg,
-                      ),
+                      3 => _buildPhoneStep(networks, userPhone, isDark, cardBg),
                       4 =>
                         _isGhana
                             ? _buildBundleStep(
@@ -1828,7 +1826,9 @@ class _EnhancedInternetDataWizardState
                 ),
                 TextButton(
                   onPressed: () => ref.invalidate(
-                    internationalDataOperatorsProvider(_selectedCountry.isoCode),
+                    internationalDataOperatorsProvider(
+                      _selectedCountry.isoCode,
+                    ),
                   ),
                   child: const Text('Retry'),
                 ),
@@ -2030,11 +2030,12 @@ class _EnhancedInternetDataWizardState
     final detected = _detectedNetwork(networks);
     final rawUserDigits = userPhone.replaceAll(RegExp(r'\D'), '');
     final dialDigits = _selectedCountry.dialCode.replaceAll(RegExp(r'\D'), '');
-    final isMyNumberForSelectedCountry = rawUserDigits.isNotEmpty &&
+    final isMyNumberForSelectedCountry =
+        rawUserDigits.isNotEmpty &&
         (_isGhana
             ? (rawUserDigits.startsWith('233') ||
-                rawUserDigits.length == 9 ||
-                rawUserDigits.length == 10)
+                  rawUserDigits.length == 9 ||
+                  rawUserDigits.length == 10)
             : (dialDigits.isNotEmpty && rawUserDigits.startsWith(dialDigits)));
     final formattedMyNumber = userPhone.startsWith('0')
         ? '233${userPhone.substring(1)}'
@@ -2097,7 +2098,10 @@ class _EnhancedInternetDataWizardState
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          CountryFlagBadge(isoCode: _selectedCountry.isoCode, flagUrl: _selectedCountry.flagUrl),
+                          CountryFlagBadge(
+                            isoCode: _selectedCountry.isoCode,
+                            flagUrl: _selectedCountry.flagUrl,
+                          ),
                           const SizedBox(width: 8),
                           Text(
                             // The dial code resolves lazily; show the ISO code
@@ -2436,7 +2440,9 @@ class _EnhancedInternetDataWizardState
                       border: Border.all(
                         color: selected
                             ? AppColors.primary
-                            : (isDark ? Colors.white12 : const Color(0xFFE5E3EC)),
+                            : (isDark
+                                  ? Colors.white12
+                                  : const Color(0xFFE5E3EC)),
                         width: selected ? 1.5 : 1,
                       ),
                     ),
@@ -2591,7 +2597,8 @@ class _EnhancedInternetDataWizardState
                     color: AppColors.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Text(_globalPayBanner,
+                  child: Text(
+                    _globalPayBanner,
                     style: const TextStyle(
                       fontSize: 12.5,
                       fontWeight: FontWeight.w700,
@@ -2653,8 +2660,10 @@ class _EnhancedInternetDataWizardState
                 ),
                 behavior: HitTestBehavior.opaque,
                 child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 4,
+                    horizontal: 2,
+                  ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -2690,7 +2699,7 @@ class _EnhancedInternetDataWizardState
             const itemHeight = 48.0;
             final itemWidth =
                 (constraints.maxWidth - (crossAxisCount - 1) * spacing) /
-                    crossAxisCount;
+                crossAxisCount;
             final aspectRatio = itemWidth / itemHeight;
 
             return GridView.builder(
@@ -2707,9 +2716,8 @@ class _EnhancedInternetDataWizardState
                 final value = displayedAmounts[index];
                 final selected = _amountValue == value;
                 return GestureDetector(
-                  onTap: () => setState(
-                    () => _amount.text = value.toStringAsFixed(0),
-                  ),
+                  onTap: () =>
+                      setState(() => _amount.text = value.toStringAsFixed(0)),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 160),
                     alignment: Alignment.center,
@@ -2721,8 +2729,8 @@ class _EnhancedInternetDataWizardState
                         color: selected
                             ? AppColors.primary
                             : (isDark
-                                ? Colors.white12
-                                : const Color(0xFFE5E3EC)),
+                                  ? Colors.white12
+                                  : const Color(0xFFE5E3EC)),
                         width: selected ? 1.5 : 1,
                       ),
                     ),
@@ -2746,15 +2754,11 @@ class _EnhancedInternetDataWizardState
         if (hasMore) ...[
           const SizedBox(height: 12),
           GestureDetector(
-            onTap: () => setState(
-              () => _showAllQuickAmounts = !_showAllQuickAmounts,
-            ),
+            onTap: () =>
+                setState(() => _showAllQuickAmounts = !_showAllQuickAmounts),
             child: Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 18,
-                vertical: 13,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
               decoration: BoxDecoration(
                 color: cardBg,
                 borderRadius: BorderRadius.circular(14),
@@ -2938,7 +2942,9 @@ class _EnhancedInternetDataWizardState
         // MSISDN.
         : dialDigits.isEmpty
         ? _digits
-        : (_digits.startsWith(dialDigits) ? _digits : '$dialDigits$localDigits');
+        : (_digits.startsWith(dialDigits)
+              ? _digits
+              : '$dialDigits$localDigits');
     final cost = _isGhana ? (bundle?.price ?? 0) : _amountValue;
     // The charge is quoted in the operator's sender currency, so label it with
     // the same code the payment draft carries.
@@ -2981,8 +2987,7 @@ class _EnhancedInternetDataWizardState
               _isSelfRecipient(ref.watch(authSessionProvider)?.user.phoneNumber)
               ? 'Delivered instantly to your line once payment is confirmed.'
               : 'Recipient can take the data bundle now or save it as Lida Value.',
-          payWith:
-              _funding.isLidaValue ? null : 'MoMo or Card · choose next',
+          payWith: _funding.isLidaValue ? null : 'MoMo or Card · choose next',
           payAmount: _isGhana
               ? totalLabel
               : (fxPaid == null
@@ -2995,7 +3000,8 @@ class _EnhancedInternetDataWizardState
               : [
                   if (bundle != null) bundle.dataAmount,
                   totalLabel,
-                  if (fxPaid != null) '(≈ $fxCode ${fxPaid.toStringAsFixed(2)})',
+                  if (fxPaid != null)
+                    '(≈ $fxCode ${fxPaid.toStringAsFixed(2)})',
                 ].join(' · '),
           onChangeCountry: _funding == ServiceFunding.lidaValueUse
               ? null
@@ -3318,7 +3324,11 @@ class _DataCountryCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
               ),
               alignment: Alignment.center,
-              child: CountryFlagBadge(isoCode: country.isoCode, flagUrl: country.flagUrl, size: 34),
+              child: CountryFlagBadge(
+                isoCode: country.isoCode,
+                flagUrl: country.flagUrl,
+                size: 34,
+              ),
             ),
             const SizedBox(width: 14),
             Expanded(

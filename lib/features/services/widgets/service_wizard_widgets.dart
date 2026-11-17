@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/app_button.dart';
 import 'country_flag_badge.dart';
 
 /// Step bar shared by the Airtime and Internet Data wizards.
@@ -40,97 +41,84 @@ class ServiceWizardStepBar extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
       color: isDark ? AppColors.darkScaffold : AppColors.lightScaffold,
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          for (var i = 0; i < labels.length; i++) ...[
-            Expanded(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => onStepTap(i + 1),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        gradient: (i + 1) <= currentStep
-                            ? AppColors.brandGradient
-                            : null,
-                        color: (i + 1) <= currentStep
-                            ? null
-                            : (isDark ? AppColors.darkSurface : Colors.white),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: (i + 1) <= currentStep
-                              ? AppColors.primary
-                              : (isDark
-                                    ? Colors.white24
-                                    : const Color(0xFFD9D7E0)),
-                          width: 1.5,
-                        ),
-                        boxShadow: (i + 1) == currentStep
-                            ? AppShadows.glow(
-                                AppColors.primary,
-                                alpha: 0.32,
-                                blur: 12,
-                              )
-                            : null,
-                      ),
-                      alignment: Alignment.center,
-                      child: (i + 1) < currentStep ||
-                              currentStep == ServiceWizardStepBar.stepCount
-                          ? const Icon(
-                              Icons.check_rounded,
-                              size: 18,
-                              color: Colors.white,
-                            )
-                          : Text(
-                              '${i + 1}',
-                              style: TextStyle(
-                                color: (i + 1) == currentStep
-                                    ? Colors.white
-                                    : scheme.onSurfaceVariant,
-                                fontWeight: FontWeight.w800,
-                                fontSize: 13.5,
-                              ),
-                            ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      labels[i],
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: (i + 1) == currentStep
-                            ? FontWeight.w800
-                            : FontWeight.w600,
-                        color: (i + 1) == currentStep
-                            ? AppColors.primary
-                            : scheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            if (i < labels.length - 1)
+          Row(
+            children: [
               Container(
-                width: 12,
-                height: 2.5,
-                margin: const EdgeInsets.only(bottom: 18),
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
                 decoration: BoxDecoration(
-                  color: (i + 1) < currentStep
-                      ? AppColors.primary
-                      : (isDark ? Colors.white12 : const Color(0xFFE0DEE8)),
-                  borderRadius: BorderRadius.circular(2),
+                  color: scheme.primaryContainer.withValues(alpha: 0.55),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  'STEP $currentStep OF $stepCount',
+                  style: TextStyle(
+                    color: scheme.primary,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                  ),
                 ),
               ),
-          ],
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  currentStep == stepCount
+                      ? 'Final step'
+                      : 'Next · ${labels[currentStep]}',
+                  textAlign: TextAlign.end,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: scheme.onSurfaceVariant,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            labels[currentStep - 1],
+            style: Theme.of(context).textTheme.titleLarge
+                ?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.35),
+          ),
+          const SizedBox(height: 13),
+          Row(
+            children: [
+              for (var i = 0; i < labels.length; i++) ...[
+                Expanded(
+                  child: Semantics(
+                    button: true,
+                    label: '${labels[i]}, step ${i + 1}',
+                    child: InkWell(
+                      onTap: () => onStepTap(i + 1),
+                      borderRadius: BorderRadius.circular(4),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 5),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: i < currentStep
+                                ? scheme.primary
+                                : scheme.outlineVariant,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                if (i < labels.length - 1) const SizedBox(width: 6),
+              ],
+            ],
+          ),
         ],
       ),
     );
@@ -158,7 +146,6 @@ class ServiceWizardBottomBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final scheme = Theme.of(context).colorScheme;
 
     return Container(
@@ -169,102 +156,31 @@ class ServiceWizardBottomBar extends StatelessWidget {
         MediaQuery.paddingOf(context).bottom + 14,
       ),
       decoration: BoxDecoration(
-        color: isDark ? AppColors.darkSurface : Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.06),
-            blurRadius: 16,
-            offset: const Offset(0, -4),
-          ),
-        ],
+        color: scheme.surface,
+        border: Border(top: BorderSide(color: scheme.outlineVariant)),
       ),
       child: Row(
         children: [
-          GestureDetector(
-            onTap: onPrevious,
-            child: Container(
-              height: 48,
-              padding: const EdgeInsets.symmetric(horizontal: 18),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(
-                  color: AppColors.primary.withValues(alpha: 0.7),
-                ),
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.arrow_back_rounded,
-                    size: 16,
-                    color: AppColors.primary,
-                  ),
-                  SizedBox(width: 6),
-                  Text(
-                    'PREVIOUS',
-                    style: TextStyle(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 12.5,
-                      letterSpacing: 0.4,
-                    ),
-                  ),
-                ],
-              ),
+          SizedBox(
+            height: 58,
+            child: OutlinedButton.icon(
+              onPressed: submitting ? null : onPrevious,
+              icon: const Icon(Icons.arrow_back_rounded, size: 18),
+              label: const Text('Back'),
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: GestureDetector(
-              onTap: canNext ? onNext : null,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                height: 48,
-                decoration: BoxDecoration(
-                  gradient: canNext ? AppColors.brandGradient : null,
-                  color: canNext
-                      ? null
-                      : (isDark
-                            ? AppColors.darkInput
-                            : const Color(0xFFE5E5EA)),
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                alignment: Alignment.center,
-                child: submitting
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            isFinalStep
-                                ? Icons.lock_outline_rounded
-                                : Icons.arrow_forward_rounded,
-                            size: 17,
-                            color: canNext
-                                ? Colors.white
-                                : scheme.onSurfaceVariant,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            isFinalStep ? confirmLabel : 'NEXT',
-                            style: TextStyle(
-                              color: canNext
-                                  ? Colors.white
-                                  : scheme.onSurfaceVariant,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 13.5,
-                              letterSpacing: 0.4,
-                            ),
-                          ),
-                        ],
-                      ),
+            child: AppButton(
+              label: isFinalStep ? confirmLabel : 'Continue',
+              loading: submitting,
+              onPressed: canNext && !submitting ? onNext : null,
+              icon: Icon(
+                isFinalStep
+                    ? Icons.lock_outline_rounded
+                    : Icons.arrow_forward_rounded,
+                size: 18,
+                color: canNext ? Colors.white : scheme.onSurfaceVariant,
               ),
             ),
           ),
@@ -437,7 +353,9 @@ class _NetworkTile extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: selected
                       ? AppColors.primary.withValues(alpha: 0.12)
-                      : (isDark ? AppColors.darkInput : const Color(0xFFF3F3F6)),
+                      : (isDark
+                            ? AppColors.darkInput
+                            : const Color(0xFFF3F3F6)),
                   borderRadius: BorderRadius.circular(13),
                 ),
                 child: Icon(

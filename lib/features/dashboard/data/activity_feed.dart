@@ -155,7 +155,11 @@ class ActivityFeed {
     try {
       final raw = await _api.getRaw(
         ApiEndpoints.lidaValueHistory,
-        queryParameters: const {'limit': 50, 'page': 1},
+        queryParameters: {
+          'limit': 50,
+          'page': 1,
+          if (_userId.trim().isNotEmpty) 'userId': _userId.trim(),
+        },
       );
       return rowsOf(raw)
           .map((row) => _rewardRow(row, TransactionType.lidaValue, 'LV'))
@@ -171,7 +175,11 @@ class ActivityFeed {
     try {
       final raw = await _api.getRaw(
         ApiEndpoints.lidapointsHistory,
-        queryParameters: const {'limit': 50, 'page': 1},
+        queryParameters: {
+          'limit': 50,
+          'page': 1,
+          if (_userId.trim().isNotEmpty) 'userId': _userId.trim(),
+        },
       );
       return rowsOf(raw)
           .map(

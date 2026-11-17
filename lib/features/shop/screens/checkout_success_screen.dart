@@ -96,7 +96,6 @@ class CheckoutSuccessScreen extends ConsumerWidget {
           ),
           Expanded(
             child: ListView(
-              physics: const BouncingScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
               children: [
                 SurfaceCard(
@@ -104,7 +103,10 @@ class CheckoutSuccessScreen extends ConsumerWidget {
                   radius: 22,
                   child: Column(
                     children: [
-                      _OrderRow(label: 'Order Reference', value: order.reference),
+                      _OrderRow(
+                        label: 'Order Reference',
+                        value: order.reference,
+                      ),
                       const SizedBox(height: 10),
                       _OrderRow(
                         label: 'Items Paid',
@@ -120,8 +122,7 @@ class CheckoutSuccessScreen extends ConsumerWidget {
                         const SizedBox(height: 10),
                         _OrderRow(
                           label: 'Discount',
-                          value:
-                              '-${Formatters.currency(order.discount!)}',
+                          value: '-${Formatters.currency(order.discount!)}',
                         ),
                       ],
                       if (order.deliveryFee != null &&
@@ -201,9 +202,7 @@ class CheckoutSuccessScreen extends ConsumerWidget {
                                   ),
                                 ),
                               ],
-                              if (address
-                                  .deliveryInstructions
-                                  .isNotEmpty) ...[
+                              if (address.deliveryInstructions.isNotEmpty) ...[
                                 const SizedBox(height: 4),
                                 Text(
                                   '“${address.deliveryInstructions}”',

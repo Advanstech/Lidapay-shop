@@ -32,6 +32,7 @@ abstract class ServicesRepository {
     required double amount,
     required String networkId,
     required bool saveToLidaValue,
+    required String clientReference,
     bool isSelfTopup = false,
   });
   Future<ServiceReceipt> buyGlobalAirtime({
@@ -44,6 +45,7 @@ abstract class ServicesRepository {
     String? senderNumber,
     String senderCountryCode = 'GH',
     String currency = 'USD',
+    required String clientReference,
     bool isSelfTopup = false,
   });
   Future<ServiceReceipt> buyDataBundle({
@@ -51,6 +53,7 @@ abstract class ServicesRepository {
     required String networkId,
     required DataBundle bundle,
     required bool saveToLidaValue,
+    required String clientReference,
     bool isSelfTopup = false,
   });
   Future<ServiceReceipt> buyGlobalDataBundle({
@@ -64,6 +67,7 @@ abstract class ServicesRepository {
     String? senderNumber,
     String senderCountryCode = 'GH',
     String currency = 'USD',
+    required String clientReference,
     bool isSelfTopup = false,
   });
   Future<ServiceReceipt> payQr({

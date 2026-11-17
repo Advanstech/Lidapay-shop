@@ -38,9 +38,6 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
         onRefresh: _refresh,
         edgeOffset: topInset + 68,
         child: CustomScrollView(
-          physics: const BouncingScrollPhysics(
-            parent: AlwaysScrollableScrollPhysics(),
-          ),
           slivers: [
             SliverToBoxAdapter(
               child: _AnalyticsHero(
@@ -92,9 +89,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
                       subtitle: 'by weekday',
                       icon: Icons.bar_chart_rounded,
                       isDark: isDark,
-                      child: WeekdayActivityBars(
-                        counts: data.weekdayCounts,
-                      ),
+                      child: WeekdayActivityBars(counts: data.weekdayCounts),
                     ),
                     if (data.stats.isNotEmpty) ...[
                       const SizedBox(height: 14),

@@ -193,7 +193,7 @@ void main() {
 
     await tester.enterText(find.byType(TextField).last, '900112233');
     await _settleLatency(tester);
-    await tester.tap(find.text('NEXT'));
+    await tester.tap(find.text('Continue'));
     await tester.pumpAndSettle(const Duration(milliseconds: 100));
 
     // With no fixed plans to show, Reloadly data falls back to amount entry.
@@ -225,14 +225,16 @@ void main() {
 
     await tester.enterText(find.byType(TextField).last, '900112233');
     await _settleLatency(tester);
-    await tester.tap(find.text('NEXT'));
+    await tester.tap(find.text('Continue'));
     await tester.pumpAndSettle(const Duration(milliseconds: 100));
 
     expect(find.text('Enter Amount'), findsOneWidget);
     // The mock operator quotes USD while Togo's own currency is XOF.
+    await tester.ensureVisible(find.text('USD 20'));
+    await tester.pumpAndSettle(const Duration(milliseconds: 100));
     await tester.tap(find.text('USD 20'));
     await tester.pumpAndSettle(const Duration(milliseconds: 100));
-    await tester.tap(find.text('NEXT'));
+    await tester.tap(find.text('Continue'));
     await tester.pumpAndSettle(const Duration(milliseconds: 100));
 
     // Label the charge with the currency actually debited, never the
@@ -255,7 +257,7 @@ void main() {
 
     await tester.enterText(find.byType(TextField).last, '08031234567');
     await _settleLatency(tester);
-    await tester.tap(find.text('NEXT'));
+    await tester.tap(find.text('Continue'));
     await tester.pumpAndSettle(const Duration(milliseconds: 100));
 
     // The detected operator's plans lead the grid.
@@ -270,7 +272,7 @@ void main() {
 
     await tester.tap(find.text('30GB Monthly'));
     await tester.pumpAndSettle(const Duration(milliseconds: 100));
-    await tester.tap(find.text('NEXT'));
+    await tester.tap(find.text('Continue'));
     await tester.pumpAndSettle(const Duration(milliseconds: 100));
 
     expect(find.text('MoMo or Card · choose next'), findsOneWidget);

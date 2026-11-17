@@ -172,13 +172,13 @@ void main() {
     await tester.tap(find.text('MTN').last);
     await tester.pumpAndSettle(const Duration(milliseconds: 100));
 
-    await tester.tap(find.text('NEXT').last);
+    await tester.tap(find.text('Continue').last);
     await tester.pumpAndSettle(const Duration(milliseconds: 100));
     await tester.drag(find.byType(CustomScrollView), const Offset(0, -350));
     await tester.pumpAndSettle(const Duration(milliseconds: 100));
     await tester.tap(find.text('GH₵ 10'));
     await tester.pumpAndSettle(const Duration(milliseconds: 100));
-    await tester.tap(find.text('NEXT').last);
+    await tester.tap(find.text('Continue').last);
     await tester.pumpAndSettle(const Duration(milliseconds: 100));
 
     // 10.00 against a 2.00 balance: the wallet cannot cover it.

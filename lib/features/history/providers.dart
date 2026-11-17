@@ -78,9 +78,12 @@ class HistoryController extends StateNotifier<AsyncValue<HistoryState>> {
     if (!mounted) return;
     state = first.whenData((items) {
       _page = 1;
+      // The repository returns up to _pageSize + 1 rows; the extra row is
+      // the has-more sentinel and is never displayed.
+      final hasMore = items.length > _pageSize;
       return HistoryState(
-        items: items,
-        hasMore: items.length == _pageSize,
+        items: items.take(_pageSize).toList(),
+        hasMore: hasMore,
         filter: filter,
       );
     });
@@ -141,10 +144,11 @@ class HistoryController extends StateNotifier<AsyncValue<HistoryState>> {
     if (!mounted) return;
     next.whenData((items) {
       _page += 1;
+      final hasMore = items.length > _pageSize;
       state = AsyncData(
         current.copyWith(
-          items: [...current.items, ...items],
-          hasMore: items.length == _pageSize,
+          items: [...current.items, ...items.take(_pageSize)],
+          hasMore: hasMore,
         ),
       );
     });

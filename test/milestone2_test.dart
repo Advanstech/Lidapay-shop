@@ -170,7 +170,7 @@ void main() {
     expect(find.text('Save to Lida Value'), findsNothing);
 
     // Amount choices and delivery options live on the next step.
-    await tester.tap(find.text('NEXT').last);
+    await tester.tap(find.text('Continue').last);
     await tester.pumpAndSettle(const Duration(milliseconds: 100));
     expect(find.text('Quick Amounts'), findsOneWidget);
     expect(find.text('Save to Lida Value'), findsNothing);
@@ -178,7 +178,7 @@ void main() {
     await tester.pumpAndSettle(const Duration(milliseconds: 100));
     await tester.tap(find.text('GH₵ 10'));
     await tester.pumpAndSettle(const Duration(milliseconds: 100));
-    await tester.tap(find.text('NEXT').last);
+    await tester.tap(find.text('Continue').last);
     await tester.pumpAndSettle(const Duration(milliseconds: 100));
     expect(find.textContaining('10.00'), findsWidgets);
     await tester.pageBack();

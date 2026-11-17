@@ -137,9 +137,6 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
         onRefresh: _refresh,
         edgeOffset: topInset + 72,
         child: CustomScrollView(
-          physics: const BouncingScrollPhysics(
-            parent: AlwaysScrollableScrollPhysics(),
-          ),
           slivers: [
             SliverPersistentHeader(
               pinned: true,
@@ -147,11 +144,11 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
                 height: topInset + 64,
                 builder: (context, isStuck) => DecoratedBox(
                   decoration: BoxDecoration(
-                    gradient: AppColors.heroGradient,
+                    color: const Color(0xFF33295E),
                     boxShadow: isStuck
                         ? [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.22),
+                              color: Colors.black.withValues(alpha: 0.16),
                               blurRadius: 14,
                               offset: const Offset(0, 6),
                             ),
@@ -299,14 +296,11 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
                                             : (isDark
                                                   ? AppColors.darkSurface
                                                   : Colors.white),
-                                        borderRadius: BorderRadius.circular(10),
+                                        borderRadius: BorderRadius.circular(20),
                                         border: Border.all(
                                           color: selected
                                               ? AppColors.primary
-                                              : (isDark
-                                                    ? Colors.white30
-                                                    : const Color(0xFF2B2B2B)),
-                                          width: 1,
+                                              : scheme.outlineVariant,
                                         ),
                                       ),
                                       alignment: Alignment.center,

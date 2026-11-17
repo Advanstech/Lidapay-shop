@@ -49,25 +49,26 @@ class NotificationsScreen extends ConsumerWidget {
     AppNotification n,
   ) async {
     final decisionId = n.data['decisionId']?.toString().trim();
-    await ref.read(readNotificationsProvider.notifier).markRead(
-      n.id,
-      relatedKeys: [
-        ...n.mergedIds,
-        if (decisionId != null && decisionId.isNotEmpty) ...[
-          'decision_$decisionId',
-          'decision|$decisionId',
-        ],
-      ],
-    );
+    await ref
+        .read(readNotificationsProvider.notifier)
+        .markRead(
+          n.id,
+          relatedKeys: [
+            ...n.mergedIds,
+            if (decisionId != null && decisionId.isNotEmpty) ...[
+              'decision_$decisionId',
+              'decision|$decisionId',
+            ],
+          ],
+        );
     if (!context.mounted) return;
     final targetRoute = await showModalBottomSheet<String>(
       context: context,
       useRootNavigator: true,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _NotificationDetailSheet(
-        notification: n.copyWith(isRead: true),
-      ),
+      builder: (_) =>
+          _NotificationDetailSheet(notification: n.copyWith(isRead: true)),
     );
     if (targetRoute == null || !context.mounted) return;
     if (targetRoute.startsWith('/shop/orders') ||
@@ -149,9 +150,6 @@ class NotificationsScreen extends ConsumerWidget {
                   : RefreshIndicator(
                       onRefresh: () => _refresh(ref),
                       child: ListView.separated(
-                        physics: const BouncingScrollPhysics(
-                          parent: AlwaysScrollableScrollPhysics(),
-                        ),
                         padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
                         itemCount: items.length,
                         separatorBuilder: (_, _) => const SizedBox(height: 12),
@@ -186,47 +184,35 @@ class _NotificationsHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       width: double.infinity,
       padding: EdgeInsets.fromLTRB(
         20,
-        MediaQuery.paddingOf(context).top + 14,
+        MediaQuery.paddingOf(context).top + 12,
         20,
-        20,
+        16,
       ),
-      decoration: const BoxDecoration(
-        gradient: AppColors.heroGradient,
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(28)),
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        border: Border(bottom: BorderSide(color: scheme.outlineVariant)),
       ),
       child: Row(
         children: [
-          GestureDetector(
-            onTap: onBack,
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.18),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              alignment: Alignment.center,
-              child: const Icon(
-                Icons.arrow_back_rounded,
-                color: Colors.white,
-                size: 22,
-              ),
-            ),
+          IconButton.filledTonal(
+            onPressed: onBack,
+            tooltip: 'Back',
+            icon: const Icon(Icons.arrow_back_rounded),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Notifications',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 21,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: scheme.onSurface,
                     fontWeight: FontWeight.w800,
                     letterSpacing: -0.3,
                   ),
@@ -235,7 +221,7 @@ class _NotificationsHeader extends StatelessWidget {
                 Text(
                   unread == 0 ? 'You\'re all caught up' : '$unread unread',
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.75),
+                    color: scheme.onSurfaceVariant,
                     fontSize: 12.5,
                     fontWeight: FontWeight.w500,
                   ),
@@ -246,21 +232,7 @@ class _NotificationsHeader extends StatelessWidget {
           if (onMarkAll != null)
             TextButton(
               onPressed: onMarkAll,
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.white,
-                backgroundColor: Colors.white.withValues(alpha: 0.14),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 8,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-              ),
-              child: const Text(
-                'Mark all read',
-                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
-              ),
+              child: const Text('Mark all read'),
             ),
         ],
       ),

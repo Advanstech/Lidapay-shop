@@ -79,9 +79,6 @@ class LidaValueScreen extends ConsumerWidget {
             },
             edgeOffset: topInset + 68,
             child: CustomScrollView(
-              physics: const BouncingScrollPhysics(
-                parent: AlwaysScrollableScrollPhysics(),
-              ),
               slivers: [
                 SliverPersistentHeader(
                   pinned: true,

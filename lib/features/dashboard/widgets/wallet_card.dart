@@ -9,8 +9,7 @@ import '../data/dashboard_models.dart';
 import '../providers.dart';
 
 /// Hero wallet card — deep-ink gradient with warm brand glows, the balance,
-/// and four live statistics tiles (Lida Value / Points / Transactions /
-/// Analytics) that route to their respective screens.
+/// and live statistics tiles that route to their respective screens.
 class WalletCard extends ConsumerWidget {
   const WalletCard({super.key, required this.wallet});
 
@@ -78,7 +77,7 @@ class WalletCard extends ConsumerWidget {
                         Row(
                           children: [
                             Text(
-                              'Lidapay Wallet',
+                              'AVAILABLE LIDA VALUE',
                               style: Theme.of(context).textTheme.labelSmall
                                   ?.copyWith(
                                     color: Colors.white70,
@@ -86,30 +85,7 @@ class WalletCard extends ConsumerWidget {
                                     letterSpacing: 0.8,
                                   ),
                             ),
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 9,
-                                vertical: 3,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: Colors.white.withValues(alpha: 0.12),
-                                ),
-                              ),
-                              child: const Text(
-                                'LV',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 0.4,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 6),
+                            const SizedBox(width: 4),
                             const Icon(
                               Icons.chevron_right_rounded,
                               color: Colors.white70,
@@ -122,7 +98,9 @@ class WalletCard extends ConsumerWidget {
                               child: GestureDetector(
                                 onTap: () =>
                                     ref
-                                            .read(balanceHiddenProvider.notifier)
+                                            .read(
+                                              balanceHiddenProvider.notifier,
+                                            )
                                             .state =
                                         !hidden,
                                 child: Container(
@@ -185,18 +163,6 @@ class WalletCard extends ConsumerWidget {
                   const SizedBox(height: 14),
                   Row(
                     children: [
-                      Expanded(
-                        child: _HeroStatTile(
-                          icon: Icons.diamond_rounded,
-                          iconColor: AppColors.gold,
-                          value: hidden
-                              ? '•••'
-                              : '${wallet.lidaValueUnits.toStringAsFixed(1)} LV',
-                          label: 'Lida Value',
-                          onTap: () => context.push(AppRoutes.lidaValue),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
                       Expanded(
                         child: _HeroStatTile(
                           icon: Icons.stars_rounded,
@@ -335,4 +301,3 @@ class _HeroStatTile extends StatelessWidget {
     );
   }
 }
-

@@ -140,9 +140,8 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen> {
                 children: [
                   Text(
                     'Search services',
-                    style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
+                    style: Theme.of(ctx).textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w800),
                   ),
                   const SizedBox(height: 12),
                   TextField(
@@ -236,9 +235,6 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen> {
 
     return Scaffold(
       body: CustomScrollView(
-        physics: const BouncingScrollPhysics(
-          parent: AlwaysScrollableScrollPhysics(),
-        ),
         slivers: [
           SliverPersistentHeader(
             pinned: true,
@@ -246,16 +242,14 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen> {
               height: topInset + 80,
               builder: (context, isStuck) => DecoratedBox(
                 decoration: BoxDecoration(
-                  gradient: AppColors.heroGradient,
-                  boxShadow: isStuck
-                      ? [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.22),
-                            blurRadius: 14,
-                            offset: const Offset(0, 6),
-                          ),
-                        ]
-                      : null,
+                  color: scaffoldBg,
+                  border: Border(
+                    bottom: BorderSide(
+                      color: isStuck
+                          ? scheme.outlineVariant
+                          : Colors.transparent,
+                    ),
+                  ),
                 ),
                 child: Padding(
                   padding: EdgeInsets.fromLTRB(20, topInset + 12, 20, 12),
@@ -583,10 +577,10 @@ class _AirServicesTopBar extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Air Services',
+              Text(
+                'Services',
                 style: TextStyle(
-                  color: Colors.white,
+                  color: Theme.of(context).colorScheme.onSurface,
                   fontSize: 21,
                   fontWeight: FontWeight.w800,
                   letterSpacing: -0.3,
@@ -594,9 +588,9 @@ class _AirServicesTopBar extends StatelessWidget {
               ),
               const SizedBox(height: 2),
               Text(
-                'Airtime • Data • Convert',
+                'Top up, convert and earn',
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.8),
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                   fontSize: 12.5,
                   fontWeight: FontWeight.w500,
                 ),
@@ -627,36 +621,44 @@ class _AirServicesHeroStats extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(20, 6, 20, 20),
-      decoration: const BoxDecoration(gradient: AppColors.heroGradient),
-      child: const Row(
-        children: [
-          Expanded(
-            child: _HeroStatChip(
-              icon: Icons.bolt_rounded,
-              title: 'Instant',
-              subtitle: 'Delivery',
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: scheme.surface,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: scheme.outlineVariant),
+        ),
+        child: const Row(
+          children: [
+            Expanded(
+              child: _HeroStatChip(
+                icon: Icons.bolt_rounded,
+                title: 'Fast',
+                subtitle: 'Digital delivery',
+              ),
             ),
-          ),
-          SizedBox(width: 10),
-          Expanded(
-            child: _HeroStatChip(
-              icon: Icons.public_rounded,
-              title: '150+',
-              subtitle: 'Countries',
+            SizedBox(width: 8),
+            Expanded(
+              child: _HeroStatChip(
+                icon: Icons.public_rounded,
+                title: 'Worldwide',
+                subtitle: 'Global operators',
+              ),
             ),
-          ),
-          SizedBox(width: 10),
-          Expanded(
-            child: _HeroStatChip(
-              icon: Icons.verified_user_rounded,
-              title: 'Secure',
-              subtitle: 'Payments',
+            SizedBox(width: 8),
+            Expanded(
+              child: _HeroStatChip(
+                icon: Icons.verified_user_rounded,
+                title: 'Secure',
+                subtitle: 'Verified payments',
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -670,18 +672,23 @@ class _HeroIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.16),
-          borderRadius: BorderRadius.circular(13),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      color: scheme.surface,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: scheme.outlineVariant),
+          ),
+          alignment: Alignment.center,
+          child: Icon(icon, color: scheme.onSurface, size: 21),
         ),
-        alignment: Alignment.center,
-        child: Icon(icon, color: Colors.white, size: 20),
       ),
     );
   }
@@ -700,43 +707,36 @@ class _HeroStatChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.13),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+        color: scheme.primaryContainer.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(15),
       ),
-      child: Row(
+      child: Column(
         children: [
-          Icon(icon, color: Colors.white, size: 16),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                Text(
-                  subtitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.76),
-                    fontSize: 10,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
+          Icon(icon, color: scheme.primary, size: 20),
+          const SizedBox(height: 6),
+          Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: scheme.onSurface,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            subtitle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: scheme.onSurfaceVariant,
+              fontSize: 9.5,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],

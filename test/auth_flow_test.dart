@@ -76,6 +76,8 @@ void main() {
     expect(find.text('Use password instead'), findsOneWidget);
 
     // Switch smoothly to Password mode and sign in.
+    await tester.ensureVisible(find.text('Use password instead'));
+    await tester.pumpAndSettle(const Duration(milliseconds: 100));
     await tester.tap(find.text('Use password instead'));
     await tester.pumpAndSettle(const Duration(milliseconds: 100));
     expect(find.text('Enter Password'), findsOneWidget);
@@ -86,7 +88,7 @@ void main() {
     await tester.pumpAndSettle(const Duration(milliseconds: 100));
 
     expect(find.textContaining('Hello,'), findsOneWidget);
-    expect(find.text('Lidapay Wallet'), findsOneWidget);
+    expect(find.text('AVAILABLE LIDA VALUE'), findsOneWidget);
     expect(find.text('Services'), findsWidgets); // section header + dock label
     expect(find.text('Flash deals'), findsOneWidget);
     final listFinder = find.byType(CustomScrollView).first;
@@ -130,6 +132,8 @@ void main() {
     await tester.enterText(find.byType(TextFormField).at(0), '0244588584');
     await tester.pumpAndSettle(const Duration(milliseconds: 100));
     await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle(const Duration(milliseconds: 100));
+    await tester.ensureVisible(find.text('Use password instead'));
     await tester.pumpAndSettle(const Duration(milliseconds: 100));
     await tester.tap(find.text('Use password instead'));
     await tester.pumpAndSettle(const Duration(milliseconds: 100));
@@ -208,7 +212,9 @@ void main() {
       scrollable: find.byType(Scrollable).first,
     );
     expect(
-      tester.widget<AppButton>(find.widgetWithText(AppButton, 'Continue')).onPressed,
+      tester
+          .widget<AppButton>(find.widgetWithText(AppButton, 'Continue'))
+          .onPressed,
       isNotNull,
     );
     await tester.tap(find.widgetWithText(AppButton, 'Continue'));
@@ -282,7 +288,9 @@ void main() {
       scrollable: find.byType(Scrollable).first,
     );
     expect(
-      tester.widget<AppButton>(find.widgetWithText(AppButton, 'Continue')).onPressed,
+      tester
+          .widget<AppButton>(find.widgetWithText(AppButton, 'Continue'))
+          .onPressed,
       isNotNull,
     );
     await tester.tap(find.widgetWithText(AppButton, 'Continue'));
@@ -364,9 +372,12 @@ void main() {
       final container = ProviderScope.containerOf(
         tester.element(find.byType(DashboardScreen)),
       );
-      await container.read(paymentSessionProvider.notifier).beginPayment(
+      await container
+          .read(paymentSessionProvider.notifier)
+          .beginPayment(
             PendingPayment.ghanaAirtime(
               reference: 'LDP-TEST-1',
+              clientReference: 'LDP-TEST-1',
               amount: 10,
               recipientNumber: '0244588584',
               networkId: '4',
@@ -378,7 +389,9 @@ void main() {
 
       // Simulate Android delivering `lidapay://redirect-url?...` into GoRouter.
       final router = container.read(routerProvider);
-      router.go('lidapay://redirect-url?orderId=ADV-1&token=saved-token&status=success');
+      router.go(
+        'lidapay://redirect-url?orderId=ADV-1&token=saved-token&status=success',
+      );
       await tester.pumpAndSettle(const Duration(milliseconds: 100));
 
       expect(find.byType(SplashScreen), findsNothing);

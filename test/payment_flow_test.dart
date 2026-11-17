@@ -154,6 +154,7 @@ class _RecordingServices extends MockServicesRepository {
     required double amount,
     required String networkId,
     required bool saveToLidaValue,
+    required String clientReference,
     bool isSelfTopup = false,
   }) async {
     calls.add('localAirtime:$recipientNumber:$amount:$networkId');
@@ -171,6 +172,7 @@ class _RecordingServices extends MockServicesRepository {
     String? senderNumber,
     String senderCountryCode = 'GH',
     String currency = 'USD',
+    required String clientReference,
     bool isSelfTopup = false,
   }) async {
     calls.add('globalAirtime:$recipientNumber:$countryCode:$operatorId');
@@ -183,6 +185,7 @@ class _RecordingServices extends MockServicesRepository {
     required String networkId,
     required DataBundle bundle,
     required bool saveToLidaValue,
+    required String clientReference,
     bool isSelfTopup = false,
   }) async {
     calls.add('ghanaData:$recipientNumber:${bundle.id}');
@@ -201,6 +204,7 @@ class _RecordingServices extends MockServicesRepository {
     String? senderNumber,
     String senderCountryCode = 'GH',
     String currency = 'USD',
+    required String clientReference,
     bool isSelfTopup = false,
   }) async {
     calls.add('globalData:$recipientNumber:$countryCode');
@@ -244,6 +248,7 @@ _session({List<PaymentQueryResult>? queue}) async {
 
 PendingPayment _ghanaAirtime() => PendingPayment.ghanaAirtime(
   reference: 'LDP-1',
+  clientReference: 'LDP-test-pf-1',
   amount: 10,
   recipientNumber: '0244555666',
   networkId: '4',
@@ -417,6 +422,7 @@ void main() {
 
       final payment = PendingPayment.globalAirtime(
         reference: 'LDP-7',
+        clientReference: 'LDP-test-pf-2',
         payAmount: 95.5,
         payCurrency: 'GHS',
         deliverAmount: 10,
@@ -550,6 +556,7 @@ void main() {
       );
       final draft = PendingPayment.globalAirtime(
         reference: 'LDP-8',
+        clientReference: 'LDP-test-pf-3',
         payAmount: 95.5,
         payCurrency: 'GHS',
         deliverAmount: 10,
@@ -757,6 +764,7 @@ void main() {
       await session.beginPayment(
         PendingPayment.shopOrder(
           reference: 'LDP-SHOP-1',
+          clientReference: 'LDP-test-pf-4',
           orderId: 'mongo-ord-1',
           orderNumber: 'LPS261116000099',
           total: 120,

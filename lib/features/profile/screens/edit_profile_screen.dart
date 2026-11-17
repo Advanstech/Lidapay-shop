@@ -143,8 +143,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             ),
           );
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Profile & KYC address updated.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profile & KYC address updated.')),
+      );
       context.pop();
     } on ApiException catch (e) {
       if (mounted) setState(() => _apiError = e.message);
@@ -218,7 +219,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           const _ProfileHeroHeader(),
           Expanded(
             child: ListView(
-              physics: const BouncingScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 140),
               children: [
                 _VerificationCard(
@@ -313,9 +313,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 Row(
                   children: [
                     const Expanded(
-                      child: _SectionTitle(
-                        'Delivery address & location (KYC)',
-                      ),
+                      child: _SectionTitle('Delivery address & location (KYC)'),
                     ),
                     Padding(
                       padding: const EdgeInsets.only(bottom: 10),
@@ -385,7 +383,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                       AppTextField(
                         controller: _street,
                         label: 'Street address / House No.',
-                        hint: '12 Osu Oxford Street, near Total Filling Station',
+                        hint:
+                            '12 Osu Oxford Street, near Total Filling Station',
                         textInputAction: TextInputAction.next,
                       ),
                       const SizedBox(height: 14),

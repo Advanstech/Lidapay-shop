@@ -121,6 +121,7 @@ class _CartScreenState extends ConsumerState<CartScreen>
         .beginPayment(
           PendingPayment.shopOrder(
             reference: newPaymentReference(),
+            clientReference: newClientReference(),
             orderId: order.id,
             orderNumber: order.reference,
             total: order.total,

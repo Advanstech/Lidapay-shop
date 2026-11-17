@@ -19,9 +19,6 @@ class LegalDocumentScreen extends StatelessWidget {
 
     return Scaffold(
       body: CustomScrollView(
-        physics: const BouncingScrollPhysics(
-          parent: AlwaysScrollableScrollPhysics(),
-        ),
         slivers: [
           SliverPersistentHeader(
             pinned: true,

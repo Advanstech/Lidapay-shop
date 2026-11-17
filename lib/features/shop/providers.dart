@@ -39,10 +39,17 @@ final shopFeaturedProvider = FutureProvider<List<ShopProduct>>((ref) {
 
 /// Cart state is mutated by [CartController]; every repo call re-reads the
 /// server-shaped Cart so the UI never computes totals locally.
+///
+/// Scoped to the active user id so logging out or switching accounts never
+/// leaks the previous session's cart.
 final cartProvider = StateNotifierProvider<CartController, AsyncValue<Cart>>((
   ref,
 ) {
-  return CartController(ref.watch(shopRepositoryProvider));
+  final userId = ref.watch(authSessionProvider.select((s) => s?.user.id));
+  return CartController(
+    ref.watch(shopRepositoryProvider),
+    autoLoad: userId != null && userId.isNotEmpty,
+  );
 });
 
 /// The shop API publishes no favourite endpoint, so a loved product is a
@@ -135,8 +142,15 @@ final orderTrackingProvider = StreamProvider.autoDispose
     });
 
 class CartController extends StateNotifier<AsyncValue<Cart>> {
-  CartController(this._repository) : super(const AsyncLoading()) {
-    load();
+  CartController(this._repository, {bool autoLoad = true})
+    : super(
+        autoLoad
+            ? const AsyncLoading()
+            : const AsyncData(Cart(items: <CartItem>[])),
+      ) {
+    if (autoLoad) {
+      load();
+    }
   }
 
   final ShopRepository _repository;

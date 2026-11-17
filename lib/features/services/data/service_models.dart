@@ -171,6 +171,11 @@ class ServiceReceipt extends Equatable {
     required this.createdAt,
     this.isCredit,
     this.pendingTopup,
+    this.recipientNumber,
+    this.networkName,
+    this.bundleName,
+    this.currency,
+    this.serviceType,
   });
 
   final String reference;
@@ -179,6 +184,11 @@ class ServiceReceipt extends Equatable {
   final double amount;
   final DateTime createdAt;
   final bool? isCredit;
+  final String? recipientNumber;
+  final String? networkName;
+  final String? bundleName;
+  final String? currency;
+  final String? serviceType;
 
   /// Non-null when the backend parked delivery behind a recipient decision —
   /// poll `GET /topups/{topupOrderId}/status` for the final disposition.
@@ -193,6 +203,11 @@ class ServiceReceipt extends Equatable {
     createdAt,
     isCredit,
     pendingTopup,
+    recipientNumber,
+    networkName,
+    bundleName,
+    currency,
+    serviceType,
   ];
 }
 

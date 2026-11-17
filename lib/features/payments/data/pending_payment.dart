@@ -1,7 +1,13 @@
 import 'package:equatable/equatable.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../core/network/api_payload.dart';
 import 'payment_models.dart';
+
+/// Unique, per-attempt idempotency reference sent to the backend so a
+/// retried top-up is deduplicated instead of crediting the user twice.
+final _uuid = Uuid();
+String newClientReference() => 'LDP-${_uuid.v4()}';
 
 /// What a verified payment should deliver. The credit params for each kind
 /// mirror the ServicesRepository call arguments — the payment session
@@ -23,6 +29,7 @@ class PendingPayment extends Equatable {
   const PendingPayment({
     required this.kind,
     required this.reference,
+    required this.clientReference,
     required this.payAmount,
     required this.payCurrency,
     required this.deliverAmount,
@@ -42,6 +49,10 @@ class PendingPayment extends Equatable {
 
   /// Client-side reference (`LDP-…`) sent as `payTransRef` at initiation.
   final String reference;
+
+  /// Unique, per-attempt idempotency reference sent to the backend so a
+  /// retried top-up is deduplicated instead of crediting the user twice.
+  final String clientReference;
 
   /// What the sender is charged, in [payCurrency] (normally GHS).
   final double payAmount;
@@ -79,6 +90,7 @@ class PendingPayment extends Equatable {
 
   factory PendingPayment.ghanaAirtime({
     required String reference,
+    required String clientReference,
     required double amount,
     required String recipientNumber,
     required String networkId,
@@ -88,6 +100,7 @@ class PendingPayment extends Equatable {
   }) => PendingPayment(
     kind: PendingPaymentKind.ghanaAirtime,
     reference: reference,
+    clientReference: clientReference,
     payAmount: amount,
     payCurrency: 'GHS',
     deliverAmount: amount,
@@ -105,6 +118,7 @@ class PendingPayment extends Equatable {
 
   factory PendingPayment.globalAirtime({
     required String reference,
+    required String clientReference,
     required double payAmount,
     required String payCurrency,
     required double deliverAmount,
@@ -121,6 +135,7 @@ class PendingPayment extends Equatable {
   }) => PendingPayment(
     kind: PendingPaymentKind.globalAirtime,
     reference: reference,
+    clientReference: clientReference,
     payAmount: payAmount,
     payCurrency: payCurrency,
     deliverAmount: deliverAmount,
@@ -143,6 +158,7 @@ class PendingPayment extends Equatable {
 
   factory PendingPayment.ghanaData({
     required String reference,
+    required String clientReference,
     required double amount,
     required String recipientNumber,
     required String networkId,
@@ -155,6 +171,7 @@ class PendingPayment extends Equatable {
   }) => PendingPayment(
     kind: PendingPaymentKind.ghanaData,
     reference: reference,
+    clientReference: clientReference,
     payAmount: amount,
     payCurrency: 'GHS',
     deliverAmount: amount,
@@ -178,6 +195,7 @@ class PendingPayment extends Equatable {
 
   factory PendingPayment.globalData({
     required String reference,
+    required String clientReference,
     required double payAmount,
     required String payCurrency,
     required double deliverAmount,
@@ -195,6 +213,7 @@ class PendingPayment extends Equatable {
   }) => PendingPayment(
     kind: PendingPaymentKind.globalData,
     reference: reference,
+    clientReference: clientReference,
     payAmount: payAmount,
     payCurrency: payCurrency,
     deliverAmount: deliverAmount,
@@ -218,6 +237,7 @@ class PendingPayment extends Equatable {
 
   factory PendingPayment.shopOrder({
     required String reference,
+    required String clientReference,
     required String orderId,
     required String orderNumber,
     required double total,
@@ -225,6 +245,7 @@ class PendingPayment extends Equatable {
   }) => PendingPayment(
     kind: PendingPaymentKind.shopOrder,
     reference: reference,
+    clientReference: clientReference,
     payAmount: total,
     payCurrency: currency,
     deliverAmount: total,
@@ -244,6 +265,7 @@ class PendingPayment extends Equatable {
   }) => PendingPayment(
     kind: kind,
     reference: reference,
+    clientReference: clientReference,
     payAmount: payAmount,
     payCurrency: payCurrency,
     deliverAmount: deliverAmount,
@@ -262,6 +284,7 @@ class PendingPayment extends Equatable {
   Map<String, dynamic> toJson() => {
     'kind': kind.name,
     'reference': reference,
+    'clientReference': clientReference,
     'payAmount': payAmount,
     'payCurrency': payCurrency,
     'deliverAmount': deliverAmount,
@@ -284,6 +307,7 @@ class PendingPayment extends Equatable {
           PendingPaymentKind.values.asNameMap()[kindName] ??
           PendingPaymentKind.ghanaAirtime,
       reference: stringField(json, const ['reference']) ?? '',
+      clientReference: stringField(json, const ['clientReference']) ?? '',
       payAmount: numberField(json, const ['payAmount']) ?? 0,
       payCurrency: stringField(json, const ['payCurrency']) ?? 'GHS',
       deliverAmount: numberField(json, const ['deliverAmount']) ?? 0,
@@ -305,5 +329,5 @@ class PendingPayment extends Equatable {
   }
 
   @override
-  List<Object?> get props => [kind, reference];
+  List<Object?> get props => [kind, reference, clientReference];
 }

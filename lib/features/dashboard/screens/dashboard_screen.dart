@@ -49,7 +49,10 @@ class DashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    ref.listen<List<RecipientDecision>>(pendingRecipientDecisionsProvider, (_, _) {
+    ref.listen<List<RecipientDecision>>(pendingRecipientDecisionsProvider, (
+      _,
+      _,
+    ) {
       final next = ref
           .read(pendingRecipientDecisionsProvider.notifier)
           .claimNextToSurface();
@@ -92,9 +95,6 @@ class DashboardScreen extends ConsumerWidget {
         onRefresh: () => _refresh(ref),
         edgeOffset: topInset + 76,
         child: CustomScrollView(
-          physics: const BouncingScrollPhysics(
-            parent: AlwaysScrollableScrollPhysics(),
-          ),
           slivers: [
             SliverPersistentHeader(
               pinned: true,
@@ -102,16 +102,14 @@ class DashboardScreen extends ConsumerWidget {
                 height: topInset + 74,
                 builder: (context, isStuck) => DecoratedBox(
                   decoration: BoxDecoration(
-                    gradient: AppColors.heroGradient,
-                    boxShadow: isStuck
-                        ? [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.22),
-                              blurRadius: 16,
-                              offset: const Offset(0, 6),
-                            ),
-                          ]
-                        : null,
+                    color: Theme.of(context).scaffoldBackgroundColor,
+                    border: Border(
+                      bottom: BorderSide(
+                        color: isStuck
+                            ? Theme.of(context).colorScheme.outlineVariant
+                            : Colors.transparent,
+                      ),
+                    ),
                   ),
                   child: Padding(
                     padding: EdgeInsets.fromLTRB(20, topInset + 12, 20, 12),
@@ -126,14 +124,8 @@ class DashboardScreen extends ConsumerWidget {
               ),
             ),
             SliverToBoxAdapter(
-              child: Container(
-                decoration: const BoxDecoration(
-                  gradient: AppColors.heroGradient,
-                  borderRadius: BorderRadius.vertical(
-                    bottom: Radius.circular(36),
-                  ),
-                ),
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
                 child:
                     wallet.whenData((w) => WalletCard(wallet: w)).valueOrNull ??
                     const SizedBox.shrink(),
@@ -308,10 +300,7 @@ class _Header extends StatelessWidget {
             decoration: BoxDecoration(
               gradient: AppColors.brandGradient,
               shape: BoxShape.circle,
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.45),
-                width: 1.5,
-              ),
+              border: Border.all(color: scheme.surface, width: 2),
             ),
             child: ClipOval(
               child: avatarUrl != null
@@ -337,23 +326,23 @@ class _Header extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: Colors.white,
+                  color: scheme.onSurface,
                   fontWeight: FontWeight.w800,
                   letterSpacing: -0.3,
                 ),
               ),
               Text(
-                'Welcome back to Lidapay',
+                'Your money, at a glance.',
                 style: Theme.of(context).textTheme.bodySmall
-                    ?.copyWith(color: Colors.white70),
+                    ?.copyWith(color: scheme.onSurfaceVariant),
               ),
             ],
           ),
         ),
         const SizedBox(width: 8),
         Material(
-          color: Colors.white.withValues(alpha: 0.12),
-          shape: const CircleBorder(),
+          color: scheme.surface,
+          shape: CircleBorder(side: BorderSide(color: scheme.outlineVariant)),
           child: InkWell(
             onTap: () => context.push(AppRoutes.notifications),
             customBorder: const CircleBorder(),
@@ -363,9 +352,9 @@ class _Header extends StatelessWidget {
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.notifications_outlined,
-                    color: Colors.white,
+                    color: scheme.onSurface,
                     size: 22,
                   ),
                   if (unread > 0)
@@ -379,7 +368,7 @@ class _Header extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: scheme.primary,
                           borderRadius: BorderRadius.circular(9),
-                          border: Border.all(color: AppColors.navy, width: 1.5),
+                          border: Border.all(color: scheme.surface, width: 1.5),
                         ),
                         alignment: Alignment.center,
                         child: Text(

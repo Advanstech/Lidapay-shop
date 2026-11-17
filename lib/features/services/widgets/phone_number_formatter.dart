@@ -43,16 +43,23 @@ class PhoneNumberInputFormatter extends TextInputFormatter {
     if (dialDigits.isNotEmpty && digits.startsWith('00$dialDigits')) {
       digits = digits.substring(2 + dialDigits.length);
     }
-    // Strip leading dialDigits if present (e.g. pasted +234 or 234...)
+    // Strip leading dialDigits only when the input looks like a full
+    // international number (so typing a local Glo 0233... number never loses 233).
     else if (dialDigits.isNotEmpty &&
         digits.startsWith(dialDigits) &&
-        digits.length > dialDigits.length) {
+        (isoCode != 'GH'
+            ? digits.length > dialDigits.length + 6
+            : digits.length >= dialDigits.length + 9)) {
       digits = digits.substring(dialDigits.length);
     }
 
     // For Ghana, strip leading 0 if present (e.g. 0244123456 -> 244123456)
+    // and cap subscriber digits at 9 so an extra digit can't slip in as 2444...
     if (isoCode == 'GH' && digits.startsWith('0') && digits.length > 1) {
       digits = digits.substring(1);
+    }
+    if (isoCode == 'GH' && digits.length > 9) {
+      digits = digits.substring(0, 9);
     }
 
     // Cap at 15 digits (ITU-T E.164 max telephone length)
