@@ -176,6 +176,43 @@ void main() {
         UpdateUrgency.none,
       );
     });
+
+    // Captured from production on 2026-11-18: the shape the backend actually
+    // serves, including the mirrored `android` node our parser descends into.
+    test('parses the live production payload', () {
+      final policy = AppVersionPolicy.fromApiJson({
+        'minimumBuild': 33,
+        'latestBuild': 34,
+        'latestVersion': '1.1.3',
+        'storeUrl': 'https://play.google.com/store/apps/details?id=com.advansistechnologies.lidapay',
+        'message': 'Faster top-ups, new rewards and smoother checkout.',
+        'android': {
+          'minimumBuild': 33,
+          'latestBuild': 34,
+          'latestVersion': '1.1.3',
+        },
+        'ios': <String, dynamic>{},
+      });
+
+      expect(policy.minimumBuild, 33);
+      expect(policy.latestBuild, 34);
+
+      // 1.1.3 itself: nothing to show.
+      expect(
+        policy.urgencyFor(currentBuild: 34, currentVersion: '1.1.3'),
+        UpdateUrgency.none,
+      );
+      // 1.1.2 (live today): optional prompt, not blocked.
+      expect(
+        policy.urgencyFor(currentBuild: 33, currentVersion: '1.1.2'),
+        UpdateUrgency.optional,
+      );
+      // 1.1.1 and older: below the supported minimum.
+      expect(
+        policy.urgencyFor(currentBuild: 32, currentVersion: '1.1.1'),
+        UpdateUrgency.required,
+      );
+    });
   });
 
   group('AppVersionPolicy urgency', () {
