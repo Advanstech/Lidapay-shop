@@ -54,7 +54,6 @@ class _CartScreenState extends ConsumerState<CartScreen>
     }
   }
 
-
   /// Contract order: collect the postal delivery address (with optional map pin),
   /// create the order via `POST /api/v1/shop/checkout` so the backend calculates
   /// `deliveryFee` from its rate card, show the final `order.total` to the
@@ -155,12 +154,14 @@ class _CartScreenState extends ConsumerState<CartScreen>
       if (!(ModalRoute.of(context)?.isCurrent ?? true)) {
         if (next.phase == PaymentPhase.completed) {
           ref.invalidate(userOrdersProvider);
+          ref.invalidate(ordersControllerProvider);
         }
         return;
       }
       if (next.phase == PaymentPhase.completed &&
           next.shopOrderNumber != null) {
-        final order = _pendingOrder ??
+        final order =
+            _pendingOrder ??
             ref.read(lastOrderProvider) ??
             ShopOrder(
               id: next.shopOrderNumber!,
@@ -175,6 +176,7 @@ class _CartScreenState extends ConsumerState<CartScreen>
         _pendingOrder = null;
         ref.read(paymentSessionProvider.notifier).reset();
         ref.invalidate(userOrdersProvider);
+        ref.invalidate(ordersControllerProvider);
         Navigator.of(context).push(
           MaterialPageRoute<void>(
             builder: (_) => CheckoutSuccessScreen(
@@ -205,8 +207,8 @@ class _CartScreenState extends ConsumerState<CartScreen>
         children: [
           _CartHeroHeader(
             itemCount: itemCount,
-            canClear: (cart.valueOrNull?.items.isNotEmpty ?? false) &&
-                !paymentActive,
+            canClear:
+                (cart.valueOrNull?.items.isNotEmpty ?? false) && !paymentActive,
             onBack: () => context.pop(),
             onOpenOrders: () => context.push(AppRoutes.orders),
             onClear: () => ref.read(cartProvider.notifier).clear(),
@@ -233,127 +235,117 @@ class _CartScreenState extends ConsumerState<CartScreen>
                           message:
                               cart.error?.toString() ??
                               'Could not load your cart.',
-                          onRetry: () =>
-                              ref.read(cartProvider.notifier).load(),
+                          onRetry: () => ref.read(cartProvider.notifier).load(),
                         ))
                 : cartData.items.isEmpty
-                        ? EmptyView(
-                            title: 'Your cart is empty',
-                            subtitle:
-                                'Browse the shop and add something you like.',
-                            icon: Icons.shopping_cart_outlined,
-                            action: TextButton(
-                              onPressed: () => context.pop(),
-                              child: const Text('Continue shopping'),
+                ? EmptyView(
+                    title: 'Your cart is empty',
+                    subtitle: 'Browse the shop and add something you like.',
+                    icon: Icons.shopping_cart_outlined,
+                    action: TextButton(
+                      onPressed: () => context.pop(),
+                      child: const Text('Continue shopping'),
+                    ),
+                  )
+                : Column(
+                    children: [
+                      if (cart.isLoading && cart.hasValue)
+                        const LinearProgressIndicator(
+                          minHeight: 2,
+                          backgroundColor: Colors.transparent,
+                        ),
+                      Expanded(
+                        child: ListView.separated(
+                          physics: const BouncingScrollPhysics(),
+                          padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
+                          itemCount: cartData.items.length,
+                          separatorBuilder: (_, _) =>
+                              const SizedBox(height: 12),
+                          itemBuilder: (context, index) => _CartLine(
+                            item: cartData.items[index],
+                            updating: cart is AsyncLoading,
+                          ),
+                        ),
+                      ),
+                      Container(
+                        padding: EdgeInsets.fromLTRB(
+                          22,
+                          18,
+                          22,
+                          MediaQuery.paddingOf(context).bottom + 18,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isDark ? AppColors.darkSurface : Colors.white,
+                          borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(28),
+                          ),
+                          border: Border(
+                            top: BorderSide(
+                              color: isDark
+                                  ? Colors.white10
+                                  : const Color(0xFFECEAF2),
                             ),
-                          )
-                        : Column(
-                            children: [
-                              if (cart.isLoading && cart.hasValue)
-                                const LinearProgressIndicator(
-                                  minHeight: 2,
-                                  backgroundColor: Colors.transparent,
-                                ),
-                              Expanded(
-                                child: ListView.separated(
-                                  physics: const BouncingScrollPhysics(),
-                                  padding: const EdgeInsets.fromLTRB(
-                                    20,
-                                    18,
-                                    20,
-                                    24,
-                                  ),
-                                  itemCount: cartData.items.length,
-                                  separatorBuilder: (_, _) =>
-                                      const SizedBox(height: 12),
-                                  itemBuilder: (context, index) => _CartLine(
-                                    item: cartData.items[index],
-                                    updating: cart is AsyncLoading,
-                                  ),
-                                ),
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(
+                                alpha: isDark ? 0.35 : 0.06,
                               ),
-                              Container(
-                                padding: EdgeInsets.fromLTRB(
-                                  22,
-                                  18,
-                                  22,
-                                  MediaQuery.paddingOf(context).bottom + 18,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: isDark
-                                      ? AppColors.darkSurface
-                                      : Colors.white,
-                                  borderRadius: const BorderRadius.vertical(
-                                    top: Radius.circular(28),
-                                  ),
-                                  border: Border(
-                                    top: BorderSide(
-                                      color: isDark
-                                          ? Colors.white10
-                                          : const Color(0xFFECEAF2),
-                                    ),
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withValues(
-                                        alpha: isDark ? 0.35 : 0.06,
-                                      ),
-                                      blurRadius: 20,
-                                      offset: const Offset(0, -6),
-                                    ),
-                                  ],
-                                ),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    _SummaryRow(
-                                      label:
-                                          'Subtotal (${cartData.itemCount} ${cartData.itemCount == 1 ? 'item' : 'items'})',
-                                      value: Formatters.currency(cartData.subtotal),
-                                    ),
-                                    if (cartData.discount > 0) ...[
-                                      const SizedBox(height: 8),
-                                      _SummaryRow(
-                                        label: 'Discount',
-                                        value:
-                                            '-${Formatters.currency(cartData.discount)}',
-                                        valueColor: AppColors.success,
-                                      ),
-                                    ],
-                                    const SizedBox(height: 8),
-                                    const _SummaryRow(
-                                      label: 'Delivery fee',
-                                      value: 'Set at checkout',
-                                    ),
-                                    const SizedBox(height: 12),
-                                    Divider(
-                                      height: 1,
-                                      color: Theme.of(context).dividerColor,
-                                    ),
-                                    const SizedBox(height: 12),
-                                    _SummaryRow(
-                                      label: 'Total',
-                                      value: Formatters.currency(cartData.total),
-                                      emphasized: true,
-                                    ),
-                                    const SizedBox(height: 16),
-                                    AppButton(
-                                      label:
-                                          'Pay · ${Formatters.currency(cartData.total)}',
-                                      icon: const Icon(
-                                        Icons.lock_outline_rounded,
-                                        color: Colors.white,
-                                        size: 18,
-                                      ),
-                                      loading: _checkingOut,
-                                      onPressed:
-                                          _checkingOut ? null : _checkout,
-                                    ),
-                                  ],
-                                ),
+                              blurRadius: 20,
+                              offset: const Offset(0, -6),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _SummaryRow(
+                              label:
+                                  'Subtotal (${cartData.itemCount} ${cartData.itemCount == 1 ? 'item' : 'items'})',
+                              value: Formatters.currency(cartData.subtotal),
+                            ),
+                            if (cartData.discount > 0) ...[
+                              const SizedBox(height: 8),
+                              _SummaryRow(
+                                label: 'Discount',
+                                value:
+                                    '-${Formatters.currency(cartData.discount)}',
+                                valueColor: AppColors.success,
                               ),
                             ],
-                          ),
+                            const SizedBox(height: 8),
+                            const _SummaryRow(
+                              label: 'Delivery fee',
+                              value: 'Set at checkout',
+                            ),
+                            const SizedBox(height: 12),
+                            Divider(
+                              height: 1,
+                              color: Theme.of(context).dividerColor,
+                            ),
+                            const SizedBox(height: 12),
+                            _SummaryRow(
+                              label: 'Total',
+                              value: Formatters.currency(cartData.total),
+                              emphasized: true,
+                            ),
+                            const SizedBox(height: 16),
+                            AppButton(
+                              label:
+                                  'Pay · ${Formatters.currency(cartData.total)}',
+                              icon: const Icon(
+                                Icons.lock_outline_rounded,
+                                color: Colors.white,
+                                size: 18,
+                              ),
+                              loading: _checkingOut,
+                              onPressed: _checkingOut ? null : _checkout,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
           ),
         ],
       ),

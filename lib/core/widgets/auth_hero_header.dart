@@ -9,12 +9,18 @@ class AuthHeroHeader extends StatefulWidget {
     required this.subtitle,
     this.height = 240,
     this.onBack,
+    this.bottomPadding = 0,
   });
 
   final String title;
   final String subtitle;
   final double height;
   final VoidCallback? onBack;
+
+  /// Extra space below the copy — needed when the following card slides
+  /// up over the hero (e.g. the login screen's -28 overlap), so the
+  /// subtitle stays fully visible instead of being clipped by the card.
+  final double bottomPadding;
 
   @override
   State<AuthHeroHeader> createState() => _AuthHeroHeaderState();
@@ -88,7 +94,12 @@ class _AuthHeroHeaderState extends State<AuthHeroHeader>
             SafeArea(
               bottom: false,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 18),
+                padding: EdgeInsets.fromLTRB(
+                  20,
+                  8,
+                  20,
+                  18 + widget.bottomPadding,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [

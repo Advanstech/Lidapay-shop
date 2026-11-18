@@ -124,10 +124,13 @@ final recipientDecisionProvider = FutureProvider.autoDispose
 final topupStatusTrackerProvider = StreamProvider.autoDispose
     .family<TopupOrderStatus, String>((ref, topupOrderId) async* {
       final repo = ref.watch(recipientChoiceRepositoryProvider);
+      var disposed = false;
+      ref.onDispose(() => disposed = true);
       TopupOrderStatus? last;
-      while (true) {
+      while (!disposed) {
         try {
           final status = await repo.getTopupStatus(topupOrderId);
+          if (disposed) return;
           // Skip unchanged snapshots — each yield rebuilds the pending
           // screen, and rebuilds while a pointer hovers trip a debug-only
           // Flutter web mouse-tracker assertion.
@@ -135,8 +138,9 @@ final topupStatusTrackerProvider = StreamProvider.autoDispose
             last = status;
             yield status;
           }
-          if (status.isTerminal) return;
+          if (status.isTerminal || disposed) return;
         } catch (_) {
+          if (disposed) return;
           // Transient — keep polling; a parked top-up settles server-side.
         }
         await Future<void>.delayed(const Duration(seconds: 3));

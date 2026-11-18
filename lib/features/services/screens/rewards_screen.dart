@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/app_button.dart';
@@ -21,6 +23,7 @@ class LidaPointsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final points = ref.watch(lidaPointsProvider);
     final options = ref.watch(pointsRedeemOptionsProvider);
+    final historyAsync = ref.watch(lidaPointsHistoryProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
@@ -32,102 +35,395 @@ class LidaPointsScreen extends ConsumerWidget {
         ),
         error: (error, _) => ErrorView(
           message: error.toString(),
-          onRetry: () => ref.invalidate(lidaPointsProvider),
+          onRetry: () {
+            ref.invalidate(lidaPointsProvider);
+            ref.read(lidaPointsHistoryProvider.notifier).refresh();
+          },
         ),
         data: (wallet) => RefreshIndicator(
           onRefresh: () async {
             ref.invalidate(lidaPointsProvider);
             ref.invalidate(pointsRedeemOptionsProvider);
-            await ref.read(lidaPointsProvider.future);
+            await Future.wait([
+              ref.read(lidaPointsProvider.future),
+              ref.read(lidaPointsHistoryProvider.notifier).refresh(),
+            ]);
           },
-          child: CustomScrollView(
-            slivers: [
-              SliverToBoxAdapter(
-                child: _PointsHero(wallet: wallet, isDark: isDark),
-              ),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 6),
-                  child: Text(
-                    'Redeem points',
-                    style: Theme.of(context).textTheme.titleMedium
-                        ?.copyWith(fontWeight: FontWeight.w800),
+          child: NotificationListener<ScrollNotification>(
+            onNotification: (notification) {
+              if (notification.metrics.pixels >=
+                  notification.metrics.maxScrollExtent - 240) {
+                ref.read(lidaPointsHistoryProvider.notifier).loadMore();
+              }
+              return false;
+            },
+            child: CustomScrollView(
+              slivers: [
+                SliverToBoxAdapter(
+                  child: _PointsHero(wallet: wallet, isDark: isDark),
+                ),
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
+                    child: Text(
+                      'Redeem points',
+                      style: Theme.of(context).textTheme.titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w800),
+                    ),
                   ),
                 ),
-              ),
-              SliverToBoxAdapter(
-                child: options.when(
-                  loading: () => const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                    child: AppSkeleton(height: 120, borderRadius: 20),
-                  ),
-                  error: (_, _) => const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 20),
-                    child: SizedBox.shrink(),
-                  ),
-                  data: (opts) => opts.isEmpty
-                      ? const SizedBox.shrink()
-                      : Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          child: Column(
-                            children: [
-                              for (final option in opts) ...[
-                                _RedeemOptionTile(
-                                  option: option,
-                                  wallet: wallet,
-                                  isDark: isDark,
-                                ),
-                                const SizedBox(height: 10),
-                              ],
-                            ],
-                          ),
-                        ),
-                ),
-              ),
-              const SliverToBoxAdapter(child: SizedBox(height: 18)),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-                  child: Row(
-                    children: [
-                      Text(
-                        'Points activity',
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.w800),
+                SliverToBoxAdapter(
+                  child: options.when(
+                    loading: () => const Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 8,
                       ),
-                      const Spacer(),
-                      Text(
-                        '${wallet.history.length} entries',
+                      child: AppSkeleton(height: 120, borderRadius: 20),
+                    ),
+                    error: (_, _) => _RedeemUnavailableCard(
+                      wallet: wallet,
+                      isDark: isDark,
+                      onRetry: () {
+                        ref.invalidate(pointsRedeemOptionsProvider);
+                        ref.invalidate(lidaPointsProvider);
+                      },
+                      onInvite: () => context.push(AppRoutes.inviteEarn),
+                    ),
+                    data: (opts) => opts.isEmpty
+                        ? _RedeemUnavailableCard(
+                            wallet: wallet,
+                            isDark: isDark,
+                            onRetry: () {
+                              ref.invalidate(pointsRedeemOptionsProvider);
+                              ref.invalidate(lidaPointsProvider);
+                            },
+                            onInvite: () => context.push(AppRoutes.inviteEarn),
+                          )
+                        : Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            child: Column(
+                              children: [
+                                for (final option in opts) ...[
+                                  _RedeemOptionTile(
+                                    option: option,
+                                    wallet: wallet,
+                                    isDark: isDark,
+                                  ),
+                                  const SizedBox(height: 10),
+                                ],
+                              ],
+                            ),
+                          ),
+                  ),
+                ),
+                const SliverToBoxAdapter(child: SizedBox(height: 18)),
+                ..._buildHistorySlivers(
+                  context,
+                  ref,
+                  wallet: wallet,
+                  historyAsync: historyAsync,
+                  isDark: isDark,
+                ),
+                const SliverToBoxAdapter(child: SizedBox(height: 32)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildHistorySlivers(
+    BuildContext context,
+    WidgetRef ref, {
+    required LidaPointsWallet wallet,
+    required AsyncValue<LidaPointsHistoryState> historyAsync,
+    required bool isDark,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    final state = historyAsync.valueOrNull;
+    final items = state?.items ?? wallet.history;
+    final countLabel = state?.total != null
+        ? '${items.length} of ${state!.total} entries'
+        : '${items.length} entries';
+
+    return [
+      SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+          child: Row(
+            children: [
+              Text(
+                'Points activity',
+                style: Theme.of(context).textTheme.titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              const Spacer(),
+              if (state != null && items.isNotEmpty) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    'Page ${state.page}',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
+              Text(
+                countLabel,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: scheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      if (historyAsync.isLoading && state == null && wallet.history.isEmpty)
+        const SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            child: AppSkeleton(height: 120, borderRadius: 16),
+          ),
+        )
+      else if (historyAsync.hasError && state == null && wallet.history.isEmpty)
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            child: Center(
+              child: OutlinedButton.icon(
+                onPressed: () =>
+                    ref.read(lidaPointsHistoryProvider.notifier).refresh(),
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+                label: const Text('Retry loading activity'),
+              ),
+            ),
+          ),
+        )
+      else if (items.isEmpty)
+        const SliverToBoxAdapter(
+          child: EmptyView(
+            title: 'No points activity yet',
+            subtitle: 'Earn points on every airtime, data and shop purchase.',
+            icon: Icons.workspace_premium_outlined,
+          ),
+        )
+      else ...[
+        SliverList.separated(
+          itemCount: items.length,
+          separatorBuilder: (_, _) => const Divider(height: 1),
+          itemBuilder: (context, index) => _PointsActivityRow(
+            receipt: items[index],
+            isDark: isDark,
+          ),
+        ),
+        if (state != null)
+          SliverToBoxAdapter(
+            child: _HistoryPaginationFooter(
+              state: state,
+              onLoadMore: () =>
+                  ref.read(lidaPointsHistoryProvider.notifier).loadMore(),
+            ),
+          ),
+      ],
+    ];
+  }
+}
+
+class _RedeemUnavailableCard extends StatelessWidget {
+  const _RedeemUnavailableCard({
+    required this.wallet,
+    required this.isDark,
+    required this.onRetry,
+    required this.onInvite,
+  });
+
+  final LidaPointsWallet wallet;
+  final bool isDark;
+  final VoidCallback onRetry;
+  final VoidCallback onInvite;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.darkSurface : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isDark ? Colors.white10 : const Color(0xFFECEAF2),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(13),
+                  ),
+                  child: const Icon(
+                    Icons.redeem_rounded,
+                    color: AppColors.primary,
+                    size: 21,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Redemption opening soon',
                         style: TextStyle(
-                          fontSize: 12,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Your ${Formatters.compact(wallet.balance)} PTS '
+                        '(≈ ${Formatters.currency(wallet.redeemableValue)}) '
+                        'are safe and active.',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          color: scheme.onSurfaceVariant,
                         ),
                       ),
                     ],
                   ),
                 ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Points redemption options are not enabled on the server yet. '
+              'Keep earning on airtime, data, referrals, and shop orders.',
+              style: TextStyle(
+                fontSize: 12.5,
+                height: 1.4,
+                color: scheme.onSurfaceVariant,
               ),
-              if (wallet.history.isEmpty)
-                const SliverToBoxAdapter(
-                  child: EmptyView(
-                    title: 'No points activity yet',
-                    subtitle:
-                        'Earn points on every airtime, data and shop purchase.',
-                    icon: Icons.workspace_premium_outlined,
-                  ),
-                )
-              else
-                SliverList.separated(
-                  itemCount: wallet.history.length,
-                  separatorBuilder: (_, _) => const Divider(height: 1),
-                  itemBuilder: (context, index) => _PointsActivityRow(
-                    receipt: wallet.history[index],
-                    isDark: isDark,
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: onInvite,
+                    icon: const Icon(Icons.group_add_rounded, size: 17),
+                    label: const Text('Invite & Earn'),
                   ),
                 ),
-              const SliverToBoxAdapter(child: SizedBox(height: 32)),
-            ],
+                const SizedBox(width: 10),
+                OutlinedButton.icon(
+                  onPressed: onRetry,
+                  icon: const Icon(Icons.refresh_rounded, size: 17),
+                  label: const Text('Check again'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HistoryPaginationFooter extends StatelessWidget {
+  const _HistoryPaginationFooter({
+    required this.state,
+    required this.onLoadMore,
+  });
+
+  final LidaPointsHistoryState state;
+  final VoidCallback onLoadMore;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    if (state.loadingMore) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            const SizedBox(width: 10),
+            Text(
+              'Loading page ${state.page + 1}…',
+              style: TextStyle(
+                fontSize: 12.5,
+                color: scheme.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    if (state.loadMoreError != null) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              state.loadMoreError!,
+              style: TextStyle(fontSize: 12.5, color: scheme.error),
+            ),
+            const SizedBox(width: 8),
+            TextButton(onPressed: onLoadMore, child: const Text('Retry')),
+          ],
+        ),
+      );
+    }
+    if (state.hasMore) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+        child: Center(
+          child: OutlinedButton.icon(
+            onPressed: onLoadMore,
+            icon: const Icon(Icons.expand_more_rounded, size: 18),
+            label: Text('Load more (Page ${state.page + 1})'),
+          ),
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 14),
+      child: Center(
+        child: Text(
+          'Showing all ${state.items.length} entries',
+          style: TextStyle(
+            fontSize: 12,
+            color: scheme.onSurfaceVariant,
+            fontWeight: FontWeight.w600,
           ),
         ),
       ),
@@ -322,9 +618,23 @@ class _RedeemOptionTile extends ConsumerWidget {
                       ],
                     ),
                   ),
-                  Icon(
-                    Icons.chevron_right_rounded,
-                    color: scheme.onSurfaceVariant,
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 7,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Text(
+                      'Redeem',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.primary,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -446,6 +756,7 @@ class _RedeemSheetState extends ConsumerState<_RedeemSheet> {
             idempotencyKey: _idempotencyKey,
           );
       ref.invalidate(lidaPointsProvider);
+      ref.read(lidaPointsHistoryProvider.notifier).refresh();
       if (mounted) Navigator.of(context).pop(receipt);
     } catch (e) {
       if (mounted) {
@@ -679,13 +990,29 @@ class _PointsActivityRow extends StatelessWidget {
   }
 }
 
-/// Invite & Earn — referral code, invite stats and share actions.
+/// Invite & Earn — the user's real invitation link, usage/points stats and
+/// share actions. Backed by GET /users/invitation-link/{stats,generate} and
+/// GET /users/points.
 class InviteEarnScreen extends ConsumerWidget {
   const InviteEarnScreen({super.key});
 
+  void _copyLink(BuildContext context, String link) {
+    Clipboard.setData(ClipboardData(text: link));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Invite link copied')),
+    );
+  }
+
+  void _shareLink(String link) {
+    Share.share(
+      'Join me on LidaPay — instant airtime, data and shopping. '
+      'Sign up with my invite link:\n$link',
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final affiliate = ref.watch(affiliateSummaryProvider);
+    final overview = ref.watch(inviteOverviewProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final scheme = Theme.of(context).colorScheme;
 
@@ -742,7 +1069,7 @@ class InviteEarnScreen extends ConsumerWidget {
               ),
             ),
           ),
-          affiliate.when(
+          overview.when(
             loading: () => const SliverToBoxAdapter(
               child: Padding(
                 padding: EdgeInsets.all(20),
@@ -753,7 +1080,7 @@ class InviteEarnScreen extends ConsumerWidget {
               hasScrollBody: false,
               child: ErrorView(
                 message: e.toString(),
-                onRetry: () => ref.invalidate(affiliateSummaryProvider),
+                onRetry: () => ref.invalidate(inviteOverviewProvider),
               ),
             ),
             data: (data) => SliverToBoxAdapter(
@@ -762,7 +1089,7 @@ class InviteEarnScreen extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Referral code card
+                    // Invitation link card — link text + full-width actions.
                     Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
@@ -777,7 +1104,7 @@ class InviteEarnScreen extends ConsumerWidget {
                       child: Column(
                         children: [
                           Text(
-                            'YOUR INVITE CODE',
+                            'YOUR INVITE LINK',
                             style: TextStyle(
                               fontSize: 11,
                               letterSpacing: 1.2,
@@ -785,96 +1112,180 @@ class InviteEarnScreen extends ConsumerWidget {
                               color: scheme.onSurfaceVariant,
                             ),
                           ),
-                          const SizedBox(height: 10),
-                          SelectableText(
-                            data.code.isEmpty ? '—' : data.code,
-                            style: const TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 2,
-                              color: AppColors.primary,
+                          const SizedBox(height: 12),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 12,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? Colors.white.withValues(alpha: 0.06)
+                                  : const Color(0xFFF6F5FA),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: isDark
+                                    ? Colors.white10
+                                    : const Color(0xFFECEAF2),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.link_rounded,
+                                  size: 18,
+                                  color: AppColors.primary,
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: SelectableText(
+                                    data.link.isEmpty
+                                        ? 'No invite link yet — pull to '
+                                              'refresh or try again.'
+                                        : data.link,
+                                    maxLines: 2,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: scheme.onSurface,
+                                      height: 1.35,
+                                    ),
+                                  ),
+                                ),
+                                if (data.link.isNotEmpty) ...[
+                                  const SizedBox(width: 8),
+                                  IconButton(
+                                    tooltip: 'Copy link',
+                                    onPressed: () =>
+                                        _copyLink(context, data.link),
+                                    icon: const Icon(
+                                      Icons.copy_rounded,
+                                      size: 19,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                ],
+                              ],
                             ),
                           ),
                           const SizedBox(height: 14),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: OutlinedButton.icon(
-                                  icon: const Icon(
-                                    Icons.copy_rounded,
-                                    size: 18,
-                                  ),
-                                  label: const Text('Copy'),
-                                  onPressed: data.code.isEmpty
-                                      ? null
-                                      : () {
-                                          Clipboard.setData(
-                                            ClipboardData(text: data.code),
-                                          );
-                                          ScaffoldMessenger.of(context)
-                                              .showSnackBar(
-                                                const SnackBar(
-                                                  content: Text(
-                                                    'Invite code copied',
-                                                  ),
-                                                ),
-                                              );
-                                        },
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                flex: 2,
-                                child: AppButton(
-                                  label: 'Share',
-                                  icon: const Icon(
-                                    Icons.share_rounded,
-                                    color: Colors.white,
-                                    size: 18,
-                                  ),
-                                  onPressed: data.code.isEmpty
-                                      ? null
-                                      : () {
-                                          Share.share(
-                                            'Join me on LidaPay — instant '
-                                            'airtime, data and shopping. '
-                                            'Use my invite code ${data.code} '
-                                            'when you sign up.',
-                                          );
-                                        },
-                                ),
-                              ),
-                            ],
+                          AppButton(
+                            label: 'Share invite link',
+                            icon: const Icon(
+                              Icons.share_rounded,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                            onPressed: data.link.isEmpty
+                                ? null
+                                : () => _shareLink(data.link),
                           ),
                         ],
                       ),
                     ),
                     const SizedBox(height: 16),
-                    // Stats row
+                    // Stats row — invites used, points earned, live balance.
                     Row(
                       children: [
                         _InviteStat(
                           icon: Icons.group_outlined,
-                          value: '${data.totalInvites}',
+                          value: '${data.totalUsageCount}',
                           label: 'Invites',
                           isDark: isDark,
                         ),
                         const SizedBox(width: 10),
                         _InviteStat(
-                          icon: Icons.how_to_reg_outlined,
-                          value: '${data.activeUsers}',
-                          label: 'Active',
+                          icon: Icons.stars_outlined,
+                          value: '${data.totalPointsEarned.round()}',
+                          label: 'Points earned',
                           isDark: isDark,
                         ),
                         const SizedBox(width: 10),
                         _InviteStat(
-                          icon: Icons.payments_outlined,
-                          value: Formatters.currency(data.earnings),
-                          label: 'Earned',
+                          icon: Icons.account_balance_wallet_outlined,
+                          value: '${data.userPoints.round()}',
+                          label: 'Your points',
                           isDark: isDark,
                         ),
                       ],
                     ),
+                    // Per-link activity — only when the backend reports rows.
+                    if (data.links.isNotEmpty) ...[
+                      const SizedBox(height: 20),
+                      Text(
+                        'LINK ACTIVITY',
+                        style: TextStyle(
+                          fontSize: 11,
+                          letterSpacing: 1.2,
+                          fontWeight: FontWeight.w800,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      ...data.links.map(
+                        (link) => Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 12,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? AppColors.darkSurface
+                                  : Colors.white,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: isDark
+                                    ? Colors.white10
+                                    : const Color(0xFFECEAF2),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        link.link,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 12.5,
+                                          fontWeight: FontWeight.w700,
+                                          color: scheme.onSurface,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        '${link.usageCount} uses'
+                                        '${link.lastUsed != null ? ' · last used ${Formatters.timeAgo(link.lastUsed!)}' : ''}',
+                                        style: TextStyle(
+                                          fontSize: 11.5,
+                                          color: scheme.onSurfaceVariant,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Text(
+                                  '+${link.pointsEarned.round()} pts',
+                                  style: const TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 20),
                     Container(
                       padding: const EdgeInsets.all(16),

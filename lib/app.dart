@@ -12,7 +12,12 @@ import 'core/providers/theme_provider.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/providers.dart';
+import 'features/dashboard/providers.dart';
+import 'features/history/providers.dart';
+import 'features/recipient_choice/data/recipient_models.dart';
 import 'features/recipient_choice/providers.dart';
+import 'features/services/providers.dart';
+import 'features/shop/providers.dart';
 
 /// App-wide scroll behavior that gives both Android and iOS a smooth,
 /// elastic, native feel (and allows mouse/trackpad drag in Chrome DevTools).
@@ -56,6 +61,8 @@ class LidapayApp extends ConsumerStatefulWidget {
 
 class _LidapayAppState extends ConsumerState<LidapayApp>
     with WidgetsBindingObserver {
+  final GlobalKey<ScaffoldMessengerState> _messengerKey =
+      GlobalKey<ScaffoldMessengerState>();
   PaymentDeepLinkHandler? _deepLinks;
 
   @override
@@ -81,7 +88,13 @@ class _LidapayAppState extends ConsumerState<LidapayApp>
       hasSession: () => ref.read(hasSessionProvider),
     );
     _deepLinks!.start();
-    ref.listenManual(hasSessionProvider, (_, _) {
+    ref.listenManual(hasSessionProvider, (_, hasSession) {
+      if (!hasSession) {
+        ref.read(trackedPendingTopupsProvider.notifier).state = const {};
+      }
+      // Refresh/clear in-memory cart and orders whenever the signed-in account changes.
+      ref.invalidate(cartProvider);
+      ref.invalidate(ordersControllerProvider);
       _deepLinks?.flush();
       ref.read(pushNotificationServiceProvider).flushPendingNavigation(router);
     });
@@ -124,6 +137,41 @@ class _LidapayAppState extends ConsumerState<LidapayApp>
     final router = ref.watch(routerProvider);
     final themeMode = ref.watch(themeModeProvider);
     final isOnline = ref.watch(isOnlineProvider).valueOrNull ?? true;
+    final hasSession = ref.watch(hasSessionProvider);
+    if (hasSession) {
+      // Keep background polling active across all tabs/screens while any
+      // recipient decision is in flight.
+      ref.watch(pendingRecipientTopupsProvider);
+    }
+
+    ref.listen<TopupOrderStatus?>(recentlySettledTopupProvider, (_, next) {
+      if (next == null) return;
+      ref.read(recentlySettledTopupProvider.notifier).state = null;
+      ref.invalidate(walletSummaryProvider);
+      ref.invalidate(lidaValueProvider);
+      ref.invalidate(historyProvider);
+      ref.invalidate(recentTransactionsProvider);
+
+      // Avoid showing a duplicate snackbar when the sender is actively
+      // looking at this exact top-up's terminal view on PendingTopupScreen.
+      final activeId = ref.read(activeWaitingTopupOrderIdProvider);
+      if (activeId == next.topupOrderId) return;
+
+      final notice = describeSettledTopup(next);
+      unawaited(
+        ref
+            .read(pushNotificationServiceProvider)
+            .showLocalAlert(title: notice.title, body: notice.body),
+      );
+      _messengerKey.currentState?.showSnackBar(
+        SnackBar(
+          content: Text(notice.body),
+          backgroundColor: notice.failed ? AppColors.error : null,
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(seconds: notice.failed ? 6 : 5),
+        ),
+      );
+    });
 
     final isDark = themeMode == ThemeMode.dark ||
         (themeMode == ThemeMode.system &&
@@ -144,6 +192,7 @@ class _LidapayAppState extends ConsumerState<LidapayApp>
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: overlayStyle,
       child: MaterialApp.router(
+        scaffoldMessengerKey: _messengerKey,
         title: 'Lidapay',
         debugShowCheckedModeBanner: false,
         scrollBehavior: const LidapayScrollBehavior(),

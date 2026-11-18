@@ -18,6 +18,9 @@ class RemoteHistoryRepository implements HistoryRepository {
 
   final ApiClient _api;
   final String? _userId;
+  List<Transaction>? _cachedFeed;
+  int _cachedLimit = 0;
+  DateTime? _cachedAt;
 
   String get _requiredUserId {
     final id = _userId;
@@ -40,10 +43,20 @@ class RemoteHistoryRepository implements HistoryRepository {
     // exactly-full final page no longer reads as "more to fetch".
     final needed = page * pageSize + 1;
     var ledgerLimit = page * pageSize + 50;
-    var feed = await ActivityFeed(
-      _api,
-      _userId ?? '',
-    ).fetch(ledgerLimit: ledgerLimit);
+    final cacheValid =
+        page > 1 &&
+        _cachedFeed != null &&
+        _cachedLimit >= ledgerLimit &&
+        _cachedAt != null &&
+        DateTime.now().difference(_cachedAt!) < const Duration(seconds: 30);
+    var feed = cacheValid
+        ? _cachedFeed!
+        : await ActivityFeed(_api, _userId ?? '').fetch(ledgerLimit: ledgerLimit);
+    if (!cacheValid) {
+      _cachedFeed = feed;
+      _cachedLimit = ledgerLimit;
+      _cachedAt = DateTime.now();
+    }
     var items = feed;
     if (filter != null && filter.isActive) {
       items = items.where(filter.matches).toList();

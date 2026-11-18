@@ -43,41 +43,6 @@ class _PendingTopupsCardState extends ConsumerState<PendingTopupsCard> {
 
   @override
   Widget build(BuildContext context) {
-    // When a parked top-up settles off-screen, announce the outcome — the
-    // card just disappears otherwise and a failure would go unnoticed.
-    ref.listen<TopupOrderStatus?>(recentlySettledTopupProvider, (prev, next) {
-      if (next == null) return;
-      ref.read(recentlySettledTopupProvider.notifier).state = null;
-      final messenger = ScaffoldMessenger.maybeOf(context);
-      if (messenger == null) return;
-      final recipient =
-          next.recipientPhone ??
-          next.decision?.recipientPhone ??
-          'the recipient';
-      final failed = next.state == TopupState.failed;
-      final label = switch (next.state) {
-        TopupState.deliveredDirect =>
-          'Delivered — the ${next.serviceLabel} is on its way to $recipient.',
-        TopupState.deliveredLidaValue =>
-          next.decision?.resolvedSource == 'TIMEOUT'
-              ? '$recipient didn\'t respond — the value was saved to their '
-                    'Lida Value wallet.'
-              : 'Saved to $recipient\'s Lida Value wallet.',
-        TopupState.failed =>
-          'Top-up to $recipient failed — '
-              '${Formatters.friendlyFailureReason(next.failedReason)}',
-        _ => null,
-      };
-      if (label == null) return;
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(label),
-          backgroundColor: failed ? AppColors.error : null,
-          behavior: SnackBarBehavior.floating,
-          duration: Duration(seconds: failed ? 6 : 4),
-        ),
-      );
-    });
     final statuses = ref.watch(pendingRecipientTopupsProvider).valueOrNull;
     if (statuses == null || statuses.isEmpty) {
       return const SizedBox.shrink();

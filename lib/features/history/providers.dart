@@ -65,14 +65,19 @@ class HistoryController extends StateNotifier<AsyncValue<HistoryState>> {
   int _settleAttempts = 0;
   static const _maxSettleAttempts = 10;
 
-  Future<void> load() async {
-    final filter = state.valueOrNull?.filter ?? const HistoryFilter();
-    state = const AsyncLoading();
+  Future<void> load({HistoryFilter? filter, bool preserveData = false}) async {
+    final activeFilter =
+        filter ?? state.valueOrNull?.filter ?? const HistoryFilter();
+    if (preserveData && state.valueOrNull != null) {
+      state = const AsyncLoading<HistoryState>().copyWithPrevious(state);
+    } else {
+      state = const AsyncLoading();
+    }
     final first = await AsyncValue.guard(
       () => _repository.getTransactions(
         page: 1,
         pageSize: _pageSize,
-        filter: filter,
+        filter: activeFilter,
       ),
     );
     if (!mounted) return;
@@ -84,7 +89,7 @@ class HistoryController extends StateNotifier<AsyncValue<HistoryState>> {
       return HistoryState(
         items: items.take(_pageSize).toList(),
         hasMore: hasMore,
-        filter: filter,
+        filter: activeFilter,
       );
     });
     _scheduleSettleCheck();
@@ -106,7 +111,7 @@ class HistoryController extends StateNotifier<AsyncValue<HistoryState>> {
     }
     _settleAttempts++;
     _settleTimer = Timer(const Duration(seconds: 15), () {
-      if (mounted) load();
+      if (mounted) load(preserveData: true);
     });
   }
 
@@ -117,10 +122,7 @@ class HistoryController extends StateNotifier<AsyncValue<HistoryState>> {
   }
 
   Future<void> setFilter(HistoryFilter filter) async {
-    state = AsyncData(
-      HistoryState(items: const [], hasMore: false, filter: filter),
-    );
-    await load();
+    await load(filter: filter);
   }
 
   /// Convenience for the quick type chips — preserves any other active

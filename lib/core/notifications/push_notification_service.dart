@@ -211,14 +211,8 @@ class PushNotificationService {
     }
   }
 
-  Future<void> _showForegroundNotification(RemoteMessage message) async {
-    _ref.invalidate(rawNotificationsProvider);
-    final notification = message.notification;
-    final title = notification?.title ?? message.data['title']?.toString() ?? 'LidaPay';
-    final body = notification?.body ?? message.data['body']?.toString() ?? '';
-    final payload = jsonEncode(message.data);
-
-    const androidDetails = AndroidNotificationDetails(
+  static const NotificationDetails _defaultDetails = NotificationDetails(
+    android: AndroidNotificationDetails(
       channelId,
       channelName,
       channelDescription: channelDescription,
@@ -227,23 +221,51 @@ class PushNotificationService {
       showWhen: true,
       enableVibration: true,
       playSound: true,
-    );
-    const darwinDetails = DarwinNotificationDetails(
+    ),
+    iOS: DarwinNotificationDetails(
       presentAlert: true,
       presentBadge: true,
       presentSound: true,
-    );
-    const details = NotificationDetails(
-      android: androidDetails,
-      iOS: darwinDetails,
-      macOS: darwinDetails,
-    );
+    ),
+    macOS: DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+    ),
+  );
+
+  /// Raises a local heads-up notification when the app is active or backgrounded
+  /// (safe no-op if local notifications are unavailable on this platform).
+  Future<void> showLocalAlert({
+    required String title,
+    required String body,
+    Map<String, dynamic>? data,
+  }) async {
+    try {
+      await _localNotifications.show(
+        id: Object.hash(title, body, DateTime.now().millisecondsSinceEpoch),
+        title: title,
+        body: body,
+        notificationDetails: _defaultDetails,
+        payload: data == null ? null : jsonEncode(data),
+      );
+    } catch (_) {
+      // Non-fatal on headless tests or unsupported hosts.
+    }
+  }
+
+  Future<void> _showForegroundNotification(RemoteMessage message) async {
+    _ref.invalidate(rawNotificationsProvider);
+    final notification = message.notification;
+    final title = notification?.title ?? message.data['title']?.toString() ?? 'LidaPay';
+    final body = notification?.body ?? message.data['body']?.toString() ?? '';
+    final payload = jsonEncode(message.data);
 
     await _localNotifications.show(
       id: message.hashCode,
       title: title,
       body: body,
-      notificationDetails: details,
+      notificationDetails: _defaultDetails,
       payload: payload,
     );
   }

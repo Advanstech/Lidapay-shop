@@ -1468,6 +1468,53 @@ class RemoteServicesRepository implements ServicesRepository {
     );
   }
 
+  @override
+  Future<LidaPointsHistoryPage> getLidaPointsHistory({
+    int page = 1,
+    int limit = 20,
+  }) async {
+    final raw = await _api.getRaw(
+      ApiEndpoints.lidapointsHistory,
+      queryParameters: {'limit': limit, 'page': page},
+    );
+    final items = _parseHistoryRows(raw, ApiEndpoints.lidapointsHistory);
+    final rawMap = asMap(raw);
+    final pool = payloadPool(rawMap);
+    final meta = <String, dynamic>{
+      ...pool,
+      if (rawMap['pagination'] is Map) ...asMap(rawMap['pagination']),
+      if (rawMap['meta'] is Map) ...asMap(rawMap['meta']),
+      if (pool['pagination'] is Map) ...asMap(pool['pagination']),
+      if (pool['meta'] is Map) ...asMap(pool['meta']),
+    };
+    final total = numberField(meta, const [
+      'total',
+      'totalCount',
+      'totalItems',
+      'count',
+    ])?.round();
+    final totalPages = numberField(meta, const ['totalPages', 'pages'])?.round();
+    final hasNextFlag = meta.containsKey('hasNextPage')
+        ? meta['hasNextPage'] == true
+        : meta.containsKey('hasMore')
+        ? meta['hasMore'] == true
+        : null;
+    final hasMore = hasNextFlag ??
+        (totalPages != null
+            ? page < totalPages
+            : total != null
+            ? page * limit < total
+            : items.length >= limit);
+    return LidaPointsHistoryPage(
+      items: items,
+      page: page,
+      limit: limit,
+      hasMore: hasMore,
+      total: total,
+      totalPages: totalPages,
+    );
+  }
+
   Future<(int, double?)> _lidaPointsBalance() async {
     for (final path in const [
       ApiEndpoints.lidapointsBalance,
@@ -1536,6 +1583,74 @@ class RemoteServicesRepository implements ServicesRepository {
             'totalCommission',
           ]) ??
           0,
+    );
+  }
+
+  @override
+  Future<InviteOverview> getInviteOverview() async {
+    // Stats + points are independent; the generate call is the fallback
+    // when the user has no links yet.
+    final statsAndPoints = await Future.wait<Object?>([
+      _api.getRaw(ApiEndpoints.invitationLinkStats),
+      _api.getRaw(ApiEndpoints.points),
+    ]);
+    final statsPool = payloadPool(asMap(statsAndPoints[0]));
+    final links = rowsOf(
+      statsPool['invitationLinks'] is List
+          ? statsPool['invitationLinks']
+          : (statsAndPoints[0] is List
+                ? statsAndPoints[0]
+                : const <dynamic>[]),
+    ).map(InvitationLink.fromJson).toList();
+
+    String link = links.isEmpty ? '' : links.first.link;
+    if (link.isEmpty) {
+      final raw = await _api.getRaw(ApiEndpoints.invitationLinkGenerate);
+      link = stringField(payloadPool(asMap(raw)), const [
+        'invitationLink',
+        'link',
+        'url',
+      ]) ?? '';
+      if (link.isEmpty && raw is String) link = raw;
+    }
+
+    // GET /users/points answers a bare number, but tolerate wrapped
+    // shapes too.
+    var userPoints = 0.0;
+    final pointsRaw = statsAndPoints[1];
+    if (pointsRaw is num) {
+      userPoints = pointsRaw.toDouble();
+    } else if (pointsRaw is Map) {
+      userPoints =
+          numberField(payloadPool(asMap(pointsRaw)), const [
+            'points',
+            'balance',
+            'totalPoints',
+            'value',
+          ]) ??
+          0;
+    }
+
+    return InviteOverview(
+      link: link,
+      totalUsageCount:
+          numberField(statsPool, const [
+            'totalUsageCount',
+            'totalUses',
+            'usageCount',
+            'totalInvites',
+          ])?.round() ??
+          0,
+      totalPointsEarned:
+          numberField(statsPool, const [
+            'totalPointsEarned',
+            'pointsEarned',
+            'totalEarned',
+            'earnings',
+          ]) ??
+          0,
+      userPoints: userPoints,
+      links: links,
     );
   }
 
@@ -1749,56 +1864,60 @@ class RemoteServicesRepository implements ServicesRepository {
         path,
         queryParameters: const {'limit': 20, 'page': 1},
       );
-      return rowsOf(raw)
-          .map((row) {
-            final pool = payloadPool(row);
-            final reference = stringField(pool, _referenceKeys);
-            if (reference == null) return null;
-            return ServiceReceipt(
-              reference: reference,
-              title:
-                  stringField(pool, const [
-                    'type',
-                    'transactionType',
-                    'title',
-                    'action',
-                    'category',
-                  ]) ??
-                  'Activity',
-              message:
-                  stringField(pool, const [
-                    'description',
-                    'message',
-                    'status',
-                    'remarks',
-                    'narration',
-                  ]) ??
-                  '',
-              amount:
-                  numberField(pool, [
-                    if (path == ApiEndpoints.lidapointsHistory) 'points',
-                    'amount',
-                    'valueUnits',
-                    'points',
-                    'total',
-                  ]) ??
-                  0,
-              createdAt: _dateOf(pool),
-              isCredit: switch (stringField(pool, const [
-                'direction',
-                'entryType',
-              ])?.toLowerCase()) {
-                'credit' || 'accrual' => true,
-                'debit' || 'redemption' => false,
-                _ => null,
-              },
-            );
-          })
-          .whereType<ServiceReceipt>()
-          .toList();
+      return _parseHistoryRows(raw, path);
     } on ApiException {
       return const [];
     }
+  }
+
+  List<ServiceReceipt> _parseHistoryRows(Object? raw, String path) {
+    return rowsOf(raw)
+        .map((row) {
+          final pool = payloadPool(row);
+          final reference = stringField(pool, _referenceKeys);
+          if (reference == null) return null;
+          return ServiceReceipt(
+            reference: reference,
+            title:
+                stringField(pool, const [
+                  'type',
+                  'transactionType',
+                  'title',
+                  'action',
+                  'category',
+                ]) ??
+                'Activity',
+            message:
+                stringField(pool, const [
+                  'description',
+                  'message',
+                  'status',
+                  'remarks',
+                  'narration',
+                ]) ??
+                '',
+            amount:
+                numberField(pool, [
+                  if (path == ApiEndpoints.lidapointsHistory) 'points',
+                  'amount',
+                  'valueUnits',
+                  'points',
+                  'total',
+                ]) ??
+                0,
+            createdAt: _dateOf(pool),
+            isCredit: switch (stringField(pool, const [
+              'direction',
+              'entryType',
+            ])?.toLowerCase()) {
+              'credit' || 'accrual' => true,
+              'debit' || 'redemption' => false,
+              _ => null,
+            },
+          );
+        })
+        .whereType<ServiceReceipt>()
+        .toList();
   }
 
   ServiceReceipt _receipt(

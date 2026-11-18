@@ -117,6 +117,10 @@ abstract class ServicesRepository {
     String? destination,
   });
   Future<LidaPointsWallet> getLidaPointsWallet();
+  Future<LidaPointsHistoryPage> getLidaPointsHistory({
+    int page = 1,
+    int limit = 20,
+  });
   Future<ServiceReceipt> redeemPoints({required int points});
 
   /// Lidapoints redeem flow: options → quote → confirm (idempotent).
@@ -131,6 +135,11 @@ abstract class ServicesRepository {
     required String idempotencyKey,
   });
   Future<AffiliateSummary> getAffiliateSummary();
+
+  /// Invite & Earn overview: the shareable invitation link plus usage and
+  /// points stats (GET /users/invitation-link/{generate,stats},
+  /// GET /users/points).
+  Future<InviteOverview> getInviteOverview();
 
   /// POST /api/v1/gtpay/services — bill-payment catalogue from the GTBank
   /// Partner API. [ServiceOption.id] is the ServiceName used by query/pay.

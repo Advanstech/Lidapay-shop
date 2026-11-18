@@ -658,6 +658,33 @@ void main() {
     expect(wallet.history, isEmpty);
   });
 
+  test('Lidapoint history paginates with page, limit, and total metadata', () async {
+    final (api, adapter) = await _client((options) {
+      return {
+        'items': [
+          {
+            'transactionReference': 'TXN-PAGE2-1',
+            'points': 2,
+            'type': 'commission_share',
+            'entryType': 'accrual',
+          },
+        ],
+        'pagination': {'page': 2, 'limit': 20, 'total': 45, 'totalPages': 3},
+      };
+    });
+    final page = await RemoteServicesRepository(
+      api,
+    ).getLidaPointsHistory(page: 2, limit: 20);
+
+    expect(adapter.requests.single.queryParameters, {'limit': 20, 'page': 2});
+    expect(page.page, 2);
+    expect(page.limit, 20);
+    expect(page.total, 45);
+    expect(page.totalPages, 3);
+    expect(page.hasMore, isTrue);
+    expect(page.items.single.reference, 'TXN-PAGE2-1');
+  });
+
   test('convert rejects a destination that breaks the spec pattern', () async {
     final (api, adapter) = await _client((_) => {'status': 'QUEUED'});
     final repo = RemoteServicesRepository(api);
@@ -2118,6 +2145,73 @@ void main() {
 
         final page2 = await repo.getTransactions(page: 2, pageSize: 10);
         expect(page2, hasLength(2));
+      },
+    );
+
+    test(
+      'invite overview parses stats, bare points and skips generate',
+      () async {
+        var generateCalls = 0;
+        final (api, _) = await _client(
+          (options) {
+            if (options.path == '/api/v1/users/invitation-link/stats') {
+              return {
+                'totalUsageCount': 3,
+                'totalPointsEarned': 60,
+                'invitationLinks': [
+                  {
+                    'link': 'https://lidapay.app/invite/x/abc123',
+                    'createdAt': '2026-10-01T10:00:00.000Z',
+                    'usageCount': 3,
+                    'pointsEarned': 60,
+                  },
+                ],
+              };
+            }
+            if (options.path == '/api/v1/users/points') return 160;
+            if (options.path == '/api/v1/users/invitation-link/generate') {
+              generateCalls++;
+              return {'invitationLink': 'https://lidapay.app/invite/y/new'};
+            }
+            return {};
+          },
+        );
+
+        final overview = await RemoteServicesRepository(
+          api,
+        ).getInviteOverview();
+        expect(overview.link, 'https://lidapay.app/invite/x/abc123');
+        expect(overview.totalUsageCount, 3);
+        expect(overview.totalPointsEarned, 60);
+        expect(overview.userPoints, 160);
+        expect(overview.links, hasLength(1));
+        // Stats already had a link — generate must not be called.
+        expect(generateCalls, 0);
+      },
+    );
+
+    test(
+      'invite overview generates a link when stats is empty',
+      () async {
+        final (api, _) = await _client(
+          (options) {
+            if (options.path == '/api/v1/users/invitation-link/stats') {
+              return {'totalUsageCount': 0, 'invitationLinks': <Object>[]};
+            }
+            if (options.path == '/api/v1/users/points') return {'points': 42};
+            if (options.path == '/api/v1/users/invitation-link/generate') {
+              return {'invitationLink': 'https://lidapay.app/invite/z/fresh'};
+            }
+            return {};
+          },
+        );
+
+        final overview = await RemoteServicesRepository(
+          api,
+        ).getInviteOverview();
+        expect(overview.link, 'https://lidapay.app/invite/z/fresh');
+        expect(overview.userPoints, 42);
+        expect(overview.links, isEmpty);
       },
     );
 

@@ -1428,6 +1428,25 @@ class _EnhancedInternetDataWizardState
     ),
   );
 
+  void _continueAnotherTransaction() {
+    _detectDebounce?.cancel();
+    setState(() {
+      _receipt = null;
+      _step = widget.funding == ServiceFunding.lidaValueUse ? 3 : 1;
+      _submitting = false;
+      _phone.clear();
+      _amount.clear();
+      _selectedBundle = null;
+      _detectedOperator = null;
+      _detectError = null;
+      _detecting = false;
+      _networkSheetShown = false;
+      _resetNetworkForCountry();
+    });
+    ref.read(paymentSessionProvider.notifier).reset();
+    ref.invalidate(lidaValueTopupProvider);
+  }
+
   @override
   Widget build(BuildContext context) {
     ref.listen<PaymentSessionState>(paymentSessionProvider, (prev, next) {
@@ -1487,6 +1506,7 @@ class _EnhancedInternetDataWizardState
           serviceLabel: 'data',
           icon: Icons.wifi_tethering_rounded,
           onDone: () => Navigator.of(context).pop(),
+          onNewTransaction: _continueAnotherTransaction,
         );
       }
       return ServiceReceiptScreen(

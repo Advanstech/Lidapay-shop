@@ -16,6 +16,12 @@ class ApiEndpoints {
   static const String wallet = '/api/v1/users/wallet/user';
   static const String userAccount = '/api/v1/users/account';
   static const String points = '/api/v1/users/points';
+  static const String invitationLinkGenerate =
+      '/api/v1/users/invitation-link/generate';
+  static const String invitationLinkStats =
+      '/api/v1/users/invitation-link/stats';
+  static const String invitationLinkTrack =
+      '/api/v1/users/invitation-link/track';
   static const String resetPassword = '/api/v1/users/reset-password';
   static const String confirmResetPassword =
       '/api/v1/users/confirm-reset-password';

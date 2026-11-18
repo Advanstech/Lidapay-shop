@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/app_button.dart';
+import '../../dashboard/providers.dart';
 import '../../services/data/service_models.dart';
 import '../data/recipient_models.dart';
 import '../providers.dart';
@@ -31,6 +32,8 @@ class PendingTopupScreen extends ConsumerStatefulWidget {
     required this.serviceLabel,
     required this.icon,
     required this.onDone,
+    this.onNewTransaction,
+    this.newTransactionLabel = 'Continue transaction',
   });
 
   final PendingTopup pending;
@@ -42,6 +45,11 @@ class PendingTopupScreen extends ConsumerStatefulWidget {
   final String serviceLabel;
   final IconData icon;
   final VoidCallback onDone;
+
+  /// Optional action allowing the sender to start another transaction right
+  /// away while this parked top-up continues polling in the background.
+  final VoidCallback? onNewTransaction;
+  final String newTransactionLabel;
 
   @override
   ConsumerState<PendingTopupScreen> createState() => _PendingTopupScreenState();
@@ -64,16 +72,35 @@ class _PendingTopupScreenState extends ConsumerState<PendingTopupScreen> {
   static const _bandWarn = Duration(seconds: 60);
   static const _bandClose = Duration(seconds: 20);
 
+  late final StateController<String?> _activeWaitingCtrl;
+
   @override
   void initState() {
     super.initState();
+    _activeWaitingCtrl = ref.read(activeWaitingTopupOrderIdProvider.notifier);
     _syncWindow();
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
+    Future<void>.microtask(() {
+      if (!mounted) return;
+      _activeWaitingCtrl.state = widget.pending.topupOrderId;
+      registerTrackedPendingTopup(
+        ref,
+        topupOrderId: widget.pending.topupOrderId,
+        recipient: widget.recipientLabel,
+        serviceLabel: widget.serviceLabel,
+      );
+    });
   }
 
   @override
   void dispose() {
     _ticker?.cancel();
+    final id = widget.pending.topupOrderId;
+    Future<void>.microtask(() {
+      if (_activeWaitingCtrl.mounted && _activeWaitingCtrl.state == id) {
+        _activeWaitingCtrl.state = null;
+      }
+    });
     super.dispose();
   }
 
@@ -166,6 +193,7 @@ class _PendingTopupScreenState extends ConsumerState<PendingTopupScreen> {
             child: status?.isTerminal == true
                 ? _TerminalView(
                     status: status!,
+                    recipientLabel: widget.recipientLabel,
                     onDone: widget.onDone,
                     onCopyReference: _copyReference,
                   )
@@ -206,7 +234,9 @@ class _PendingTopupScreenState extends ConsumerState<PendingTopupScreen> {
         ),
         const SizedBox(height: 20),
         Text(
-          settling ? 'The window just closed' : 'Waiting for the recipient',
+          settling
+              ? 'Completing transfer'
+              : 'Waiting for ${widget.recipientLabel}',
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.titleLarge
               ?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.4),
@@ -216,10 +246,10 @@ class _PendingTopupScreenState extends ConsumerState<PendingTopupScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 6),
           child: Text(
             settling
-                ? 'Nothing else is needed from you — the value is moving '
-                      'into their Lida Value wallet now.'
-                : '${widget.recipientLabel} is on Lidapay. They\'re choosing '
-                      'whether to take this ${widget.serviceLabel} now or keep '
+                ? 'Your value is being credited to ${widget.recipientLabel}\'s '
+                      'Lida Value wallet and is ready for them to use.'
+                : '${widget.recipientLabel} is on Lidapay and can choose '
+                      'between this ${widget.serviceLabel} now or keeping '
                       'the value in their Lida Value wallet.',
             textAlign: TextAlign.center,
             style: TextStyle(color: muted, fontSize: 13.5, height: 1.45),
@@ -252,33 +282,35 @@ class _PendingTopupScreenState extends ConsumerState<PendingTopupScreen> {
           ],
         ),
         const SizedBox(height: 12),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              child: _ChoiceCard(
-                icon: widget.icon,
-                tint: AppColors.success,
-                title: 'Take it now',
-                detail: 'Straight to ${widget.recipientLabel}',
-                surface: surface,
-                border: border,
-                muted: muted,
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: _ChoiceCard(
+                  icon: widget.icon,
+                  tint: AppColors.success,
+                  title: 'Take it now',
+                  detail: 'Straight to ${widget.recipientLabel}',
+                  surface: surface,
+                  border: border,
+                  muted: muted,
+                ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _ChoiceCard(
-                icon: Icons.diamond_rounded,
-                tint: AppColors.violet,
-                title: 'Keep the value',
-                detail: 'Saved to their Lida Value wallet',
-                surface: surface,
-                border: border,
-                muted: muted,
+              const SizedBox(width: 12),
+              Expanded(
+                child: _ChoiceCard(
+                  icon: Icons.diamond_rounded,
+                  tint: AppColors.violet,
+                  title: 'Keep the value',
+                  detail: 'Saved to their Lida Value wallet',
+                  surface: surface,
+                  border: border,
+                  muted: muted,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         const SizedBox(height: 20),
         _SummaryCard(
@@ -292,15 +324,30 @@ class _PendingTopupScreenState extends ConsumerState<PendingTopupScreen> {
         const SizedBox(height: 14),
         _SettleNote(accent: accent, expiresAt: widget.pending.expiresAt),
         const SizedBox(height: 22),
+        if (widget.onNewTransaction != null) ...[
+          AppButton(
+            label: widget.newTransactionLabel,
+            icon: const Icon(
+              Icons.add_circle_outline_rounded,
+              color: Colors.white,
+              size: 19,
+            ),
+            onPressed: widget.onNewTransaction,
+          ),
+          const SizedBox(height: 10),
+        ],
         _LeaveButton(
+          label: widget.onNewTransaction != null
+              ? 'Go to Home'
+              : 'Continue in background',
           onPressed: widget.onDone,
           accent: accent,
           surface: surface,
         ),
         const SizedBox(height: 10),
         Text(
-          'The top-up carries on without you — check the outcome in your '
-          'history whenever you like.',
+          'Runs in the background — we\'ll notify you once '
+          '${widget.recipientLabel} responds or it credits to their Lida Value wallet.',
           textAlign: TextAlign.center,
           style: TextStyle(color: muted, fontSize: 11.5, height: 1.4),
         ),
@@ -1062,12 +1109,11 @@ class _SettleNoteState extends State<_SettleNote> {
     final ss = _remaining.inSeconds.remainder(60).toString().padLeft(2, '0');
     final clock = '$mm:$ss';
     final text = !hasWindow
-        ? 'No response window was published — checking the recipient\'s '
-              'choice directly.'
+        ? 'Checking the recipient\'s delivery preference.'
         : closed
-        ? 'Settling now — the value is going to their Lida Value wallet.'
-        : 'No answer by $clock? The value moves into their Lida Value wallet '
-              'automatically.';
+        ? 'Completing transfer — crediting their Lida Value wallet.'
+        : 'If they haven\'t picked by $clock, the value credits to their '
+              'Lida Value wallet automatically.';
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       decoration: BoxDecoration(
@@ -1103,11 +1149,13 @@ class _SettleNoteState extends State<_SettleNote> {
 
 class _LeaveButton extends StatelessWidget {
   const _LeaveButton({
+    required this.label,
     required this.onPressed,
     required this.accent,
     required this.surface,
   });
 
+  final String label;
   final VoidCallback onPressed;
   final Color accent;
   final Color surface;
@@ -1131,7 +1179,7 @@ class _LeaveButton extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(
-                'Continue in background',
+                label,
                 style: TextStyle(
                   fontSize: 14.5,
                   fontWeight: FontWeight.w800,
@@ -1151,33 +1199,39 @@ class _LeaveButton extends StatelessWidget {
 class _TerminalView extends StatelessWidget {
   const _TerminalView({
     required this.status,
+    required this.recipientLabel,
     required this.onDone,
     required this.onCopyReference,
   });
 
   final TopupOrderStatus status;
+  final String recipientLabel;
   final VoidCallback onDone;
   final VoidCallback onCopyReference;
 
   @override
   Widget build(BuildContext context) {
+    final recipient =
+        status.recipientPhone ??
+        status.decision?.recipientPhone ??
+        recipientLabel;
     final (icon, color, title, body) = status.isDeliveredDirect
         ? (
             Icons.check_circle_rounded,
             AppColors.success,
-            'Delivered',
-            'The recipient chose direct delivery — the ${status.serviceLabel} '
-                'is on its way to ${status.recipientPhone ?? 'their number'}.',
+            'Delivered to $recipient',
+            'Your ${status.serviceLabel} top-up has been credited directly to '
+                '$recipient.',
           )
         : status.isDeliveredToLidaValue
         ? (
             Icons.diamond_rounded,
             AppColors.violet,
-            'Saved to recipient\'s Lida Value',
+            'Credited to $recipient\'s Lida Value',
             status.decision?.resolvedSource == 'TIMEOUT'
-                ? 'They didn\'t respond in time, so the value was saved '
-                      'to their Lida Value wallet automatically.'
-                : 'The recipient chose to keep it in their Lida Value '
+                ? 'The value was automatically credited to $recipient\'s '
+                      'Lida Value wallet and is ready for them to use anytime.'
+                : '$recipient chose to receive the value in their Lida Value '
                       'wallet.',
           )
         : (

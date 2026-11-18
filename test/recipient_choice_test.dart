@@ -2,15 +2,20 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lidapay_app/core/network/api_client.dart';
 import 'package:lidapay_app/core/network/api_exception.dart';
 import 'package:lidapay_app/core/network/token_store.dart';
+import 'package:lidapay_app/features/dashboard/providers.dart';
 import 'package:lidapay_app/features/lida_value/providers.dart';
 import 'package:lidapay_app/features/payments/data/pending_payment.dart';
 import 'package:lidapay_app/features/payments/providers.dart';
 import 'package:lidapay_app/features/recipient_choice/data/recipient_models.dart';
 import 'package:lidapay_app/features/recipient_choice/data/remote_recipient_choice_repository.dart';
+import 'package:lidapay_app/features/recipient_choice/providers.dart';
+import 'package:lidapay_app/features/recipient_choice/screens/pending_topup_screen.dart';
 import 'package:lidapay_app/features/services/data/mock_services_repository.dart';
 import 'package:lidapay_app/features/services/data/remote_services_repository.dart';
 import 'package:lidapay_app/features/services/data/service_models.dart';
@@ -489,5 +494,103 @@ void main() {
       expect(notifier.state.debitReference, isNotNull);
       expect(services.calls.first, startsWith('send:'));
     });
+  });
+
+  testWidgets('PendingTopupScreen renders waiting UI without layout errors', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(375, 667));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final pending = PendingTopup(
+      topupOrderId: 'TXN-MWL9J79K-4B7EEC1F',
+      decisionId: 'DEC-1',
+      expiresAt: DateTime.now().add(const Duration(minutes: 4)),
+    );
+
+    var continued = false;
+    var wentHome = false;
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          topupStatusTrackerProvider.overrideWith(
+            (ref, id) => Stream.value(
+              TopupOrderStatus(
+                topupOrderId: id,
+                state: TopupState.awaitingDecision,
+                serviceType: 'DATA',
+              ),
+            ),
+          ),
+        ],
+        child: MaterialApp(
+          theme: ThemeData.dark(),
+          home: PendingTopupScreen(
+            pending: pending,
+            amountLabel: 'GH₵10.00',
+            recipientLabel: '0244954473',
+            serviceLabel: 'data',
+            icon: Icons.wifi_tethering_rounded,
+            onDone: () => wentHome = true,
+            onNewTransaction: () => continued = true,
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Sending top-up'), findsOneWidget);
+    expect(find.text('Waiting for 0244954473'), findsOneWidget);
+    expect(find.text('Take it now'), findsOneWidget);
+    expect(find.text('Keep the value'), findsOneWidget);
+
+    await tester.drag(find.byType(ListView), const Offset(0, -500));
+    await tester.pump();
+
+    expect(find.text('Continue transaction'), findsOneWidget);
+    expect(find.text('Go to Home'), findsOneWidget);
+
+    await tester.tap(find.text('Continue transaction'));
+    expect(continued, isTrue);
+
+    await tester.tap(find.text('Go to Home'));
+    expect(wentHome, isTrue);
+  });
+
+  test('describeSettledTopup formats direct acceptance and Lida Value fallback', () {
+    const tracked = TrackedPendingTopup(
+      topupOrderId: 'TXN-1',
+      recipient: '0549017820',
+      serviceLabel: 'data bundle',
+    );
+    final direct = describeSettledTopup(
+      const TopupOrderStatus(
+        topupOrderId: 'TXN-1',
+        state: TopupState.deliveredDirect,
+      ),
+      tracked: tracked,
+    );
+    expect(direct.failed, isFalse);
+    expect(direct.body, contains('0549017820'));
+    expect(direct.body, contains('accepted'));
+
+    final fallback = describeSettledTopup(
+      const TopupOrderStatus(
+        topupOrderId: 'TXN-1',
+        state: TopupState.deliveredLidaValue,
+        decision: RecipientDecision(
+          decisionId: 'D-1',
+          topupOrderId: 'TXN-1',
+          status: DecisionStatus.resolved,
+          resolvedSource: 'TIMEOUT',
+        ),
+      ),
+      tracked: tracked,
+    );
+    expect(fallback.failed, isFalse);
+    expect(fallback.body, contains('0549017820'));
+    expect(fallback.body, contains('Lida Value wallet'));
   });
 }

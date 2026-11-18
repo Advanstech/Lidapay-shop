@@ -438,6 +438,23 @@ class MockServicesRepository implements ServicesRepository {
   }
 
   @override
+  Future<LidaPointsHistoryPage> getLidaPointsHistory({
+    int page = 1,
+    int limit = 20,
+  }) async {
+    final wallet = await getLidaPointsWallet();
+    final items = page == 1 ? wallet.history : const <ServiceReceipt>[];
+    return LidaPointsHistoryPage(
+      items: items,
+      page: page,
+      limit: limit,
+      hasMore: false,
+      total: wallet.history.length,
+      totalPages: 1,
+    );
+  }
+
+  @override
   Future<List<PointsRedeemOption>> getPointsRedeemOptions() async => const [
     PointsRedeemOption(
       id: 'airtime',
@@ -516,6 +533,24 @@ class MockServicesRepository implements ServicesRepository {
       totalInvites: 18,
       activeUsers: 11,
       earnings: 146.75,
+    );
+  }
+
+  @override
+  Future<InviteOverview> getInviteOverview() async {
+    await Future<void>.delayed(_latency);
+    return InviteOverview(
+      link: 'https://lidapay.app/invite/demo/PAA-GRANT-24',
+      totalUsageCount: 3,
+      totalPointsEarned: 60,
+      userPoints: 160,
+      links: const [
+        InvitationLink(
+          link: 'https://lidapay.app/invite/demo/PAA-GRANT-24',
+          usageCount: 3,
+          pointsEarned: 60,
+        ),
+      ],
     );
   }
 

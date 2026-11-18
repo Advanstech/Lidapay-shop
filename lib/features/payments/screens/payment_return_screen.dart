@@ -73,6 +73,7 @@ class _PaymentReturnScreenState extends ConsumerState<PaymentReturnScreen> {
     ref.invalidate(lidaPointsProvider);
     ref.invalidate(lidaValueProvider);
     ref.invalidate(userOrdersProvider);
+    ref.invalidate(ordersControllerProvider);
   }
 
   Future<void> _fetchShopOrder(
@@ -107,6 +108,11 @@ class _PaymentReturnScreenState extends ConsumerState<PaymentReturnScreen> {
   void _finishToHome() {
     ref.read(paymentSessionProvider.notifier).reset();
     context.go(AppRoutes.home);
+  }
+
+  void _continueAnotherTransaction(bool isData) {
+    ref.read(paymentSessionProvider.notifier).reset();
+    context.go(isData ? AppRoutes.data : AppRoutes.airtime);
   }
 
   @override
@@ -146,8 +152,7 @@ class _PaymentReturnScreenState extends ConsumerState<PaymentReturnScreen> {
     final session = ref.watch(paymentSessionProvider);
     final receipt = _resolvedReceipt ?? session.receipt;
     final pending = _resolvedPending ?? session.pending;
-    final shopOrderNumber =
-        _resolvedShopOrderNumber ?? session.shopOrderNumber;
+    final shopOrderNumber = _resolvedShopOrderNumber ?? session.shopOrderNumber;
 
     // Delivery confirmed — show the real receipt.
     if (receipt != null) {
@@ -162,11 +167,11 @@ class _PaymentReturnScreenState extends ConsumerState<PaymentReturnScreen> {
           amountLabel: currency == 'GHS'
               ? Formatters.currency(amount)
               : '$currency ${amount.toStringAsFixed(2)}',
-          recipientLabel:
-              pending?.params['recipientNumber']?.toString() ?? '',
+          recipientLabel: pending?.params['recipientNumber']?.toString() ?? '',
           serviceLabel: isData ? 'data bundle' : 'airtime',
           icon: isData ? Icons.wifi_rounded : Icons.call_rounded,
           onDone: _finishToHome,
+          onNewTransaction: () => _continueAnotherTransaction(isData),
         );
       }
       return ServiceReceiptScreen(
@@ -183,7 +188,8 @@ class _PaymentReturnScreenState extends ConsumerState<PaymentReturnScreen> {
           _resolvedOrder ??
           ref.watch(lastOrderProvider) ??
           ShopOrder(
-            id: pending?.params['orderId']?.toString() ??
+            id:
+                pending?.params['orderId']?.toString() ??
                 shopOrderNumber ??
                 'order',
             reference: shopOrderNumber ?? 'ORD',

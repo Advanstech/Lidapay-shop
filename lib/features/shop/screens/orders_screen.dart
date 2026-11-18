@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/feedback_views.dart';
+import '../../../core/widgets/product_image.dart';
 import '../../../core/widgets/skeleton.dart';
 import '../data/shop_models.dart';
 import '../providers.dart';
@@ -60,9 +61,10 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final ordersAsync = ref.watch(userOrdersProvider);
+    final ordersAsync = ref.watch(ordersControllerProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final orders = ordersAsync.valueOrNull;
+    final state = ordersAsync.valueOrNull;
+    final orders = state?.items;
     _maybeOpenInitialOrder(orders);
 
     final inTransit =
@@ -81,7 +83,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
     return Scaffold(
       backgroundColor: isDark ? AppColors.darkScaffold : null,
       body: RefreshIndicator(
-        onRefresh: () async => ref.refresh(userOrdersProvider.future),
+        onRefresh: () => ref.read(ordersControllerProvider.notifier).load(),
         edgeOffset: MediaQuery.paddingOf(context).top + 110,
         child: CustomScrollView(
           slivers: [
@@ -89,11 +91,12 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
               child: _OrdersHero(
                 count: orders?.length ?? 0,
                 inTransit: inTransit,
-                onRefresh: () => ref.invalidate(userOrdersProvider),
+                onRefresh: () =>
+                    ref.read(ordersControllerProvider.notifier).load(),
               ),
             ),
-            switch ((ordersAsync.isLoading, ordersAsync.hasError, orders)) {
-              (true, _, _) || (_, _, null) => SliverToBoxAdapter(
+            switch ((ordersAsync.isLoading, ordersAsync.hasError, state)) {
+              (true, _, _) => SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.all(20),
                   child: Column(
@@ -111,15 +114,16 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
                 hasScrollBody: false,
                 child: ErrorView(
                   message: 'Could not load your orders.',
-                  onRetry: () => ref.invalidate(userOrdersProvider),
+                  onRetry: () =>
+                      ref.read(ordersControllerProvider.notifier).load(),
                 ),
               ),
-              (false, false, final list) when list!.isEmpty =>
+              (false, false, final OrdersListState s) when s.items.isEmpty =>
                 SliverFillRemaining(
                   hasScrollBody: false,
                   child: _EmptyOrders(onExplore: () => context.go('/shop')),
                 ),
-              (false, false, final list) => SliverPadding(
+              (false, false, final OrdersListState s) => SliverPadding(
                 padding: EdgeInsets.fromLTRB(
                   20,
                   16,
@@ -127,11 +131,44 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
                   MediaQuery.paddingOf(context).bottom + 24,
                 ),
                 sliver: SliverList.separated(
-                  itemCount: list!.length,
+                  // Sentinel row at the end keeps the next page loading while
+                  // the user scrolls — built only when hasMore is true.
+                  itemCount: s.items.length + (s.hasMore ? 1 : 0),
                   separatorBuilder: (_, _) => const SizedBox(height: 12),
-                  itemBuilder: (context, index) =>
-                      _OrderCard(order: list[index]),
+                  itemBuilder: (context, index) {
+                    if (index >= s.items.length) {
+                      if (s.loadMoreError != null) {
+                        return TextButton.icon(
+                          onPressed: () => ref
+                              .read(ordersControllerProvider.notifier)
+                              .loadMore(),
+                          icon: const Icon(Icons.refresh),
+                          label: const Text(
+                            'Could not load more. Tap to retry',
+                          ),
+                        );
+                      }
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (!mounted) return;
+                        ref.read(ordersControllerProvider.notifier).loadMore();
+                      });
+                      return const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 22),
+                        child: Center(
+                          child: SizedBox(
+                            width: 26,
+                            height: 26,
+                            child: CircularProgressIndicator(strokeWidth: 2.4),
+                          ),
+                        ),
+                      );
+                    }
+                    return _OrderCard(order: s.items[index]);
+                  },
                 ),
+              ),
+              (false, false, null) => const SliverToBoxAdapter(
+                child: SizedBox.shrink(),
               ),
             },
           ],
@@ -330,45 +367,77 @@ class _OrderCard extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
+                    // Up to three product thumbnails — the first item's
+                    // name becomes the card title so the list reads like a
+                    // purchase, not a reference number.
+                    if (order.items.isEmpty)
+                      Container(
+                        width: 46,
+                        height: 46,
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.shopping_bag_outlined,
+                          color: AppColors.primary,
+                          size: 22,
+                        ),
+                      )
+                    else
+                      Row(
+                        children: [
+                          for (var i = 0; i < order.items.length && i < 3; i++)
+                            Padding(
+                              padding: EdgeInsets.only(left: i == 0 ? 0 : 8),
+                              child: _OrderThumb(
+                                source: order.items[i].imageAsset,
+                              ),
+                            ),
+                        ],
                       ),
-                      child: const Icon(
-                        Icons.shopping_bag_outlined,
-                        color: AppColors.primary,
-                        size: 20,
-                      ),
-                    ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          if (order.items.isNotEmpty)
+                            Text(
+                              order.items.first.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
                           Text(
-                            order.reference,
+                            order.items.length > 1
+                                ? '+${order.items.length - 1} more · '
+                                      '${order.reference}'
+                                : order.reference,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 14.5,
-                              fontWeight: FontWeight.w800,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: scheme.onSurfaceVariant,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                           const SizedBox(height: 2),
                           Text(
                             'Placed $dateStr',
                             style: TextStyle(
-                              fontSize: 12,
+                              fontSize: 11.5,
                               color: scheme.onSurfaceVariant,
                             ),
                           ),
                         ],
                       ),
                     ),
+                    const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 10,
@@ -446,6 +515,48 @@ class _OrderCard extends ConsumerWidget {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Rounded product thumbnail with a bag fallback when the item has no
+/// image. `imageAsset` carries either a remote URL or a bundled asset.
+class _OrderThumb extends StatelessWidget {
+  const _OrderThumb({required this.source});
+
+  final String source;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    if (source.trim().isEmpty) {
+      return Container(
+        width: 46,
+        height: 46,
+        decoration: BoxDecoration(
+          color: AppColors.primary.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Icon(
+          Icons.shopping_bag_outlined,
+          color: AppColors.primary,
+          size: 20,
+        ),
+      );
+    }
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: 46,
+        height: 46,
+        color: isDark ? Colors.white10 : const Color(0xFFF6F5FA),
+        child: ProductImage(
+          source: source,
+          width: 46,
+          height: 46,
+          memCacheWidth: 92,
         ),
       ),
     );
@@ -810,6 +921,7 @@ class _OrderDetailSheet extends ConsumerWidget {
               try {
                 await ref.read(shopRepositoryProvider).cancelOrder(order.id);
                 ref.invalidate(userOrdersProvider);
+                ref.invalidate(ordersControllerProvider);
                 HapticFeedback.mediumImpact();
               } catch (e) {
                 if (context.mounted) {

@@ -795,6 +795,27 @@ class _AirtimeScreenState extends ConsumerState<AirtimeScreen>
     }
   }
 
+  /// Resets the wizard cleanly so the user can start another airtime purchase
+  /// immediately while a parked recipient choice continues in the background.
+  void _continueAnotherTransaction() {
+    _detectDebounce?.cancel();
+    setState(() {
+      _receipt = null;
+      _step = _firstStep;
+      _submitting = false;
+      _phone.clear();
+      _amount.clear();
+      _detectedOperator = null;
+      _detectError = null;
+      _detecting = false;
+      _autoGhanaCode = null;
+      _ghanaChoice = null;
+      _resetNetworkForCountry();
+    });
+    ref.read(paymentSessionProvider.notifier).reset();
+    ref.invalidate(lidaValueTopupProvider);
+  }
+
   /// Refresh the ledger, points, Lida Value and dashboard summary so the
   /// newly settled top-up and its accrued LidaPoints show immediately.
   void _invalidateActivityFeeds() {
@@ -1009,6 +1030,7 @@ class _AirtimeScreenState extends ConsumerState<AirtimeScreen>
           serviceLabel: 'airtime',
           icon: Icons.call_rounded,
           onDone: () => Navigator.of(context).pop(),
+          onNewTransaction: _continueAnotherTransaction,
         );
       }
       return ServiceReceiptScreen(

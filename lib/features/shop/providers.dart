@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:equatable/equatable.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -39,17 +40,10 @@ final shopFeaturedProvider = FutureProvider<List<ShopProduct>>((ref) {
 
 /// Cart state is mutated by [CartController]; every repo call re-reads the
 /// server-shaped Cart so the UI never computes totals locally.
-///
-/// Scoped to the active user id so logging out or switching accounts never
-/// leaks the previous session's cart.
 final cartProvider = StateNotifierProvider<CartController, AsyncValue<Cart>>((
   ref,
 ) {
-  final userId = ref.watch(authSessionProvider.select((s) => s?.user.id));
-  return CartController(
-    ref.watch(shopRepositoryProvider),
-    autoLoad: userId != null && userId.isNotEmpty,
-  );
+  return CartController(ref.watch(shopRepositoryProvider));
 });
 
 /// The shop API publishes no favourite endpoint, so a loved product is a
@@ -99,6 +93,90 @@ final pendingShopProductProvider = StateProvider<ShopProduct?>((ref) => null);
 final userOrdersProvider = FutureProvider.autoDispose<List<ShopOrder>>((ref) {
   return ref.watch(shopRepositoryProvider).getOrders();
 });
+
+/// Paginated orders state for the My Orders screen. Each page fetch asks the
+/// server for `pageSize + 1` rows — the extra row is the has-more sentinel,
+/// so an exactly-full final page doesn't produce a phantom next page.
+class OrdersListState extends Equatable {
+  const OrdersListState({
+    this.items = const [],
+    this.hasMore = false,
+    this.loadingMore = false,
+    this.loadMoreError,
+  });
+
+  final List<ShopOrder> items;
+  final bool hasMore;
+  final bool loadingMore;
+  final Object? loadMoreError;
+
+  @override
+  List<Object?> get props => [items, hasMore, loadingMore, loadMoreError];
+}
+
+class OrdersController extends StateNotifier<AsyncValue<OrdersListState>> {
+  OrdersController(this._repo) : super(const AsyncLoading()) {
+    load();
+  }
+
+  static const _pageSize = 15;
+
+  final ShopRepository _repo;
+  int _page = 0;
+  int _generation = 0;
+
+  Future<void> load() async {
+    final generation = ++_generation;
+    state = const AsyncLoading();
+    final next = await AsyncValue.guard(
+      () => _repo.getOrders(page: 1, limit: _pageSize + 1),
+    );
+    if (!mounted || generation != _generation) return;
+    _page = 1;
+    state = next.whenData(
+      (rows) => OrdersListState(items: rows, hasMore: rows.length > _pageSize),
+    );
+  }
+
+  Future<void> loadMore() async {
+    final current = state.valueOrNull;
+    if (current == null || !current.hasMore || current.loadingMore) return;
+    final generation = _generation;
+    state = AsyncData(
+      OrdersListState(items: current.items, hasMore: true, loadingMore: true),
+    );
+    final next = await AsyncValue.guard(
+      () => _repo.getOrders(page: _page + 1, limit: _pageSize + 1),
+    );
+    if (!mounted || generation != _generation) return;
+    state = next.when(
+      data: (rows) {
+        _page += 1;
+        return AsyncData(
+          OrdersListState(
+            items: {
+              for (final order in [...current.items, ...rows]) order.id: order,
+            }.values.toList(),
+            hasMore: rows.length > _pageSize,
+          ),
+        );
+      },
+      error: (error, _) => AsyncData(
+        OrdersListState(
+          items: current.items,
+          hasMore: true,
+          loadMoreError: error,
+        ),
+      ),
+      loading: () => state,
+    );
+  }
+}
+
+final ordersControllerProvider =
+    StateNotifierProvider<OrdersController, AsyncValue<OrdersListState>>((ref) {
+      return OrdersController(ref.watch(shopRepositoryProvider));
+    });
 
 /// Live delivery tracking info for a specific order.
 ///

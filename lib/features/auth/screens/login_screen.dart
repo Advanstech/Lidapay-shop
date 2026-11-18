@@ -487,6 +487,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final viewportHeight = MediaQuery.sizeOf(context).height;
+    final compactViewport = viewportHeight < 700;
+    final heroHeight = compactViewport ? 210.0 : 320.0;
 
     return Scaffold(
       body: SingleChildScrollView(
@@ -495,8 +498,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         ),
         child: Column(
           children: [
-            const AuthHeroHeader(
-              height: 320,
+            AuthHeroHeader(
+              height: heroHeight,
+              // The card below slides up 28px over this header; lift the
+              // copy so "Welcome back" + subtitle stay fully visible.
+              bottomPadding: 30,
               title: 'Welcome back',
               subtitle: 'Sign in to send airtime, shop deals and grow your Lida Value.',
             ),
@@ -517,9 +523,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 },
                 child: Container(
                   constraints: BoxConstraints(
-                    minHeight: MediaQuery.sizeOf(context).height - 292,
+                    minHeight: (viewportHeight - (heroHeight - 28)).clamp(
+                      0.0,
+                      double.infinity,
+                    ),
                   ),
-                  padding: const EdgeInsets.fromLTRB(24, 30, 24, 36),
+                  padding: EdgeInsets.fromLTRB(
+                    24,
+                    compactViewport ? 22 : 30,
+                    24,
+                    36,
+                  ),
                   decoration: BoxDecoration(
                     color: scheme.surface,
                     borderRadius: const BorderRadius.vertical(

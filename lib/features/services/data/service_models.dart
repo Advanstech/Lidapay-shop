@@ -241,6 +241,28 @@ class LidaPointsWallet extends Equatable {
   List<Object?> get props => [balance, redeemableValue, history];
 }
 
+/// Paginated page from `GET /api/v1/lidapoints/history?page=&limit=`.
+class LidaPointsHistoryPage extends Equatable {
+  const LidaPointsHistoryPage({
+    required this.items,
+    required this.page,
+    required this.limit,
+    required this.hasMore,
+    this.total,
+    this.totalPages,
+  });
+
+  final List<ServiceReceipt> items;
+  final int page;
+  final int limit;
+  final bool hasMore;
+  final int? total;
+  final int? totalPages;
+
+  @override
+  List<Object?> get props => [items, page, limit, hasMore, total, totalPages];
+}
+
 /// A redemption destination returned by GET /lidapoints/redeem/options —
 /// e.g. cash to MoMo, airtime, data, or Lida Value credit.
 class PointsRedeemOption extends Equatable {
@@ -349,4 +371,87 @@ class AffiliateSummary extends Equatable {
 
   @override
   List<Object?> get props => [code, totalInvites, activeUsers, earnings];
+}
+
+/// One row from GET /api/v1/users/invitation-link/stats
+/// `invitationLinks[]` — `{link, createdAt, lastUsed, usageCount,
+/// pointsEarned}`.
+class InvitationLink extends Equatable {
+  const InvitationLink({
+    required this.link,
+    this.createdAt,
+    this.lastUsed,
+    this.usageCount = 0,
+    this.pointsEarned = 0,
+  });
+
+  final String link;
+  final DateTime? createdAt;
+  final DateTime? lastUsed;
+  final int usageCount;
+  final double pointsEarned;
+
+  factory InvitationLink.fromJson(Map<String, dynamic> json) {
+    final pool = payloadPool(json);
+    return InvitationLink(
+      link:
+          stringField(pool, const ['link', 'invitationLink', 'url']) ?? '',
+      createdAt: dateField(pool, const ['createdAt', 'created_at']),
+      lastUsed: dateField(pool, const ['lastUsed', 'last_used']),
+      usageCount:
+          numberField(pool, const ['usageCount', 'uses', 'clicks'])?.round() ??
+          0,
+      pointsEarned:
+          numberField(pool, const ['pointsEarned', 'points', 'earned']) ?? 0,
+    );
+  }
+
+  @override
+  List<Object?> get props => [
+    link,
+    createdAt,
+    lastUsed,
+    usageCount,
+    pointsEarned,
+  ];
+}
+
+/// Everything the Invite & Earn page renders: the shareable link (from
+/// GET /users/invitation-link/generate when the user has none yet), the
+/// aggregate stats and the live points balance.
+class InviteOverview extends Equatable {
+  const InviteOverview({
+    required this.link,
+    this.totalUsageCount = 0,
+    this.totalPointsEarned = 0,
+    this.userPoints = 0,
+    this.links = const [],
+  });
+
+  /// Primary share target — generate result or the newest stats link.
+  final String link;
+  final int totalUsageCount;
+  final double totalPointsEarned;
+
+  /// Current Lida Points balance from GET /users/points.
+  final double userPoints;
+  final List<InvitationLink> links;
+
+  /// Short display code derived from the link's trailing segment — shown
+  /// as "YOUR INVITE CODE" when the link has a readable suffix.
+  String get code {
+    final segments = link.split('/').where((s) => s.isNotEmpty).toList();
+    final segment = segments.isEmpty ? '' : segments.last;
+    if (segment.length < 4) return link;
+    return segment;
+  }
+
+  @override
+  List<Object?> get props => [
+    link,
+    totalUsageCount,
+    totalPointsEarned,
+    userPoints,
+    links,
+  ];
 }

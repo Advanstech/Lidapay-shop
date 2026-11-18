@@ -176,10 +176,12 @@ class PaymentSessionNotifier extends StateNotifier<PaymentSessionState> {
   }) async {
     final user = _currentUser();
     if (user == null) {
-      state = const PaymentSessionState(
-        phase: PaymentPhase.failed,
-        message: 'Your session expired. Please sign in again.',
-      );
+      if (mounted) {
+        state = const PaymentSessionState(
+          phase: PaymentPhase.failed,
+          message: 'Your session expired. Please sign in again.',
+        );
+      }
       return false;
     }
     _verifying = null;
@@ -219,6 +221,7 @@ class PaymentSessionNotifier extends StateNotifier<PaymentSessionState> {
       await _store.save(_pending!);
 
       final launched = await _launchCheckout(Uri.parse(initiation.checkoutUrl));
+      if (!mounted) return true;
       if (!launched) {
         state = PaymentSessionState(
           phase: PaymentPhase.failed,
@@ -234,6 +237,7 @@ class PaymentSessionNotifier extends StateNotifier<PaymentSessionState> {
       );
       return true;
     } on ApiException catch (error) {
+      if (!mounted) return false;
       state = PaymentSessionState(
         phase: PaymentPhase.failed,
         pending: _pending,
@@ -241,6 +245,7 @@ class PaymentSessionNotifier extends StateNotifier<PaymentSessionState> {
       );
       return false;
     } catch (_) {
+      if (!mounted) return false;
       state = PaymentSessionState(
         phase: PaymentPhase.failed,
         pending: _pending,
@@ -274,11 +279,13 @@ class PaymentSessionNotifier extends StateNotifier<PaymentSessionState> {
     );
     _pending = pending;
     await _store.save(pending);
-    state = PaymentSessionState(
-      phase: PaymentPhase.initiating,
-      pending: pending,
-      message: 'Sending a payment prompt to $momo…',
-    );
+    if (mounted) {
+      state = PaymentSessionState(
+        phase: PaymentPhase.initiating,
+        pending: pending,
+        message: 'Sending a payment prompt to $momo…',
+      );
+    }
 
     final fullName = '${user.firstName} ${user.lastName}'.trim();
     try {
@@ -301,6 +308,7 @@ class PaymentSessionNotifier extends StateNotifier<PaymentSessionState> {
         case PaymentOutcome.failed:
           // A FAILED report is not the end — the telco may still confirm
           // late, and the user may simply need a fresh prompt.
+          if (!mounted) return true;
           state = PaymentSessionState(
             phase: PaymentPhase.awaitingCallback,
             pending: pending,
@@ -325,6 +333,7 @@ class PaymentSessionNotifier extends StateNotifier<PaymentSessionState> {
       }
       await _store.clear();
       _pending = null;
+      if (!mounted) return false;
       state = PaymentSessionState(
         phase: PaymentPhase.failed,
         message: error.message,
@@ -379,6 +388,7 @@ class PaymentSessionNotifier extends StateNotifier<PaymentSessionState> {
         (token == null || token.isEmpty)) {
       await _store.clear();
       _pending = null;
+      if (!mounted) return;
       state = const PaymentSessionState(
         phase: PaymentPhase.failed,
         message: 'Payment was cancelled. No charge was made.',
@@ -421,6 +431,7 @@ class PaymentSessionNotifier extends StateNotifier<PaymentSessionState> {
     await _store.clear();
     _pending = null;
     _verifying = null;
+    if (!mounted) return;
     state = const PaymentSessionState();
   }
 
@@ -447,20 +458,24 @@ class PaymentSessionNotifier extends StateNotifier<PaymentSessionState> {
     }
     final token = pending.token;
     if (token == null || token.isEmpty) {
-      state = PaymentSessionState(
-        phase: PaymentPhase.failed,
-        pending: pending,
-        message:
-            'This purchase cannot be verified — no payment token was saved.',
-      );
+      if (mounted) {
+        state = PaymentSessionState(
+          phase: PaymentPhase.failed,
+          pending: pending,
+          message:
+              'This purchase cannot be verified — no payment token was saved.',
+        );
+      }
       return;
     }
 
-    state = PaymentSessionState(
-      phase: PaymentPhase.verifying,
-      pending: pending,
-      message: 'Verifying your payment…',
-    );
+    if (mounted) {
+      state = PaymentSessionState(
+        phase: PaymentPhase.verifying,
+        pending: pending,
+        message: 'Verifying your payment…',
+      );
+    }
 
     PaymentOutcome? lastOutcome;
     for (var attempt = 0; attempt < _queryAttempts; attempt++) {
@@ -486,6 +501,7 @@ class PaymentSessionNotifier extends StateNotifier<PaymentSessionState> {
     if (lastOutcome == PaymentOutcome.failed) {
       await _store.clear();
       _pending = null;
+      if (!mounted) return;
       state = PaymentSessionState(
         phase: PaymentPhase.failed,
         message:
@@ -495,6 +511,7 @@ class PaymentSessionNotifier extends StateNotifier<PaymentSessionState> {
       return;
     }
 
+    if (!mounted) return;
     state = PaymentSessionState(
       phase: PaymentPhase.awaitingCallback,
       pending: pending,
@@ -511,21 +528,26 @@ class PaymentSessionNotifier extends StateNotifier<PaymentSessionState> {
   Future<void> _doVerifyGtPay(PendingPayment pending) async {
     final transId = pending.partnerTransId;
     if (transId == null || transId.isEmpty) {
-      state = PaymentSessionState(
-        phase: PaymentPhase.failed,
-        pending: pending,
-        message: 'This payment cannot be verified — no reference was saved.',
-      );
+      if (mounted) {
+        state = PaymentSessionState(
+          phase: PaymentPhase.failed,
+          pending: pending,
+          message:
+              'This payment cannot be verified — no reference was saved.',
+        );
+      }
       return;
     }
     final approveCopy =
         'Approve the ${Formatters.currency(pending.payAmount)} prompt on '
         '${pending.momoNumber ?? 'your phone'} and enter your MoMo PIN.';
-    state = PaymentSessionState(
-      phase: PaymentPhase.verifying,
-      pending: pending,
-      message: approveCopy,
-    );
+    if (mounted) {
+      state = PaymentSessionState(
+        phase: PaymentPhase.verifying,
+        pending: pending,
+        message: approveCopy,
+      );
+    }
 
     var sawFailure = false;
     String? lastStatus;
@@ -565,6 +587,7 @@ class PaymentSessionNotifier extends StateNotifier<PaymentSessionState> {
     }
     expired = expired || !DateTime.now().isBefore(expiresAt);
 
+    if (!mounted) return;
     final timedOut = expired && !sawFailure;
     state = PaymentSessionState(
       phase: PaymentPhase.awaitingCallback,
@@ -599,10 +622,12 @@ class PaymentSessionNotifier extends StateNotifier<PaymentSessionState> {
     }
     final user = _currentUser();
     if (user == null) {
-      state = const PaymentSessionState(
-        phase: PaymentPhase.failed,
-        message: 'Your session expired. Please sign in again.',
-      );
+      if (mounted) {
+        state = const PaymentSessionState(
+          phase: PaymentPhase.failed,
+          message: 'Your session expired. Please sign in again.',
+        );
+      }
       return false;
     }
     _verifying = null;
@@ -622,20 +647,24 @@ class PaymentSessionNotifier extends StateNotifier<PaymentSessionState> {
     // successful top-up but the pending record was not yet cleared.
     if (state.phase == PaymentPhase.completed) return;
 
-    state = PaymentSessionState(
-      phase: PaymentPhase.crediting,
-      pending: pending,
-      message: 'Payment confirmed — completing your order…',
-    );
+    if (mounted) {
+      state = PaymentSessionState(
+        phase: PaymentPhase.crediting,
+        pending: pending,
+        message: 'Payment confirmed — completing your order…',
+      );
+    }
     try {
       if (pending.kind == PendingPaymentKind.shopOrder) {
         await _store.clear();
         _pending = null;
-        state = PaymentSessionState(
-          phase: PaymentPhase.completed,
-          shopOrderNumber: pending.params['orderNumber']?.toString(),
-          message: 'Payment confirmed.',
-        );
+        if (mounted) {
+          state = PaymentSessionState(
+            phase: PaymentPhase.completed,
+            shopOrderNumber: pending.params['orderNumber']?.toString(),
+            message: 'Payment confirmed.',
+          );
+        }
         return;
       }
       await _finishWithReceipt(
@@ -645,22 +674,26 @@ class PaymentSessionNotifier extends StateNotifier<PaymentSessionState> {
     } on ApiException catch (error) {
       // Payment succeeded but delivery failed/unknown — keep the pending
       // record so the user can retry crediting without paying again.
-      state = PaymentSessionState(
-        phase: PaymentPhase.awaitingCallback,
-        pending: pending,
-        message:
-            'Payment was confirmed but the delivery did not complete '
-            '(${error.message}). Tap “I’ve paid” to retry — you will not be '
-            'charged again.',
-      );
+      if (mounted) {
+        state = PaymentSessionState(
+          phase: PaymentPhase.awaitingCallback,
+          pending: pending,
+          message:
+              'Payment was confirmed but the delivery did not complete '
+              '(${error.message}). Tap “I’ve paid” to retry — you will not '
+              'be charged again.',
+        );
+      }
     } catch (_) {
-      state = PaymentSessionState(
-        phase: PaymentPhase.awaitingCallback,
-        pending: pending,
-        message:
-            'Payment was confirmed but the delivery did not complete. Tap '
-            '“I’ve paid” to retry — you will not be charged again.',
-      );
+      if (mounted) {
+        state = PaymentSessionState(
+          phase: PaymentPhase.awaitingCallback,
+          pending: pending,
+          message:
+              'Payment was confirmed but the delivery did not complete. '
+              'Tap “I’ve paid” to retry — you will not be charged again.',
+        );
+      }
     }
   }
 
@@ -671,6 +704,7 @@ class PaymentSessionNotifier extends StateNotifier<PaymentSessionState> {
     final receipt = await creditCall;
     await _store.clear();
     _pending = null;
+    if (!mounted) return;
     state = PaymentSessionState(
       phase: PaymentPhase.completed,
       receipt: receipt,
