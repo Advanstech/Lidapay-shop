@@ -1,0 +1,5 @@
+- Static help content is modeled as immutable const classes (`SupportCategory`, `SupportFaq`, `SupportAction`) with a top-level `supportCategories` list rather than fetched from a backend.
+- Deep links into other app features are expressed as route strings stored in `SupportAction.route` (e.g. `AppRoutes.history`, `'${AppRoutes.legal}/payments'`) and resolved at render time via `context.push`.
+- Contact actions go through URI builders (`supportEmailUri`, `supportPhoneUri`) that produce `mailto:`/`tel:` URIs passed to `url_launcher`, instead of hard-coding scheme+path at call sites.
+- Screens share a consistent visual pattern: a pinned `SliverPersistentHeader` using `StickySliverHeaderDelegate` over `AppColors.heroGradient`, followed by a gradient hero card and `SliverList.separated` sections with a shared `_SectionLabel` widget.
+- Dark-mode aware cards use `Theme.of(context).brightness == Brightness.dark` to pick between `AppColors.darkSurface` and `Colors.white` backgrounds with matching border colors.

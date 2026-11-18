@@ -1,0 +1,1 @@
+Flutter + Dart SDK ^3.13.4; Riverpod 2.x for cross-feature state; go_router 14.x for deep-link-aware navigation; Dio 5.x for HTTP; Firebase Core/Messaging/Local Notifications for push; Google Maps Flutter plugin; local_auth, device_info_plus, connectivity_plus, geolocator/geocoding for device/platform capabilities.

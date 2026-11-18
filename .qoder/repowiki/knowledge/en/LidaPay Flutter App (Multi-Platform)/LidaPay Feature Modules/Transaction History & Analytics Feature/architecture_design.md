@@ -1,0 +1,7 @@
+Feature follows a clean layered layout under `lib/features/history/`:
+- `data/` — domain models (`history_models.dart`: `HistoryFilter`, `TransactionStat`, `HistoryAnalytics`, `TransactionInsight`) plus a repository interface (`history_repository.dart`) with two implementations: `RemoteHistoryRepository` (live via `ActivityFeed` + `/api/v1/transactions/*` endpoints) and `mock_history_repository.dart`.
+- `providers.dart` — Riverpod layer exposing `historyRepositoryProvider` (swaps mock/live), a `StateNotifierProvider<HistoryController, AsyncValue<HistoryState>>` handling paginated fetches, filter state, pending-settle polling (15s timer up to 10 attempts), and two `FutureProvider`s (`transactionStatsProvider`, `historyAnalyticsProvider`) for the analytics view.
+- `screens/` — `HistoryScreen` (paged, grouped-by-day ledger with sticky headers, pull-to-refresh, filter chips) and `AnalyticsScreen` (consumes `historyAnalyticsProvider`).
+- `widgets/` — reusable chart components built on `fl_chart` (`SpendCurve`, `OutcomeBreakdown`, `WeekdayActivityBars`, `CategoryBars`), plus `HistoryFilterSheet` and `TransactionDetailsSheet` as modal inputs.
+
+Dependency direction is one-way: screens → providers → repository interface → remote/mock implementation → core network layer. The repository abstraction lets the same UI run against mock data during development while the live feed merges transactions, Lida Value history, shop orders, and points into a single paged list.

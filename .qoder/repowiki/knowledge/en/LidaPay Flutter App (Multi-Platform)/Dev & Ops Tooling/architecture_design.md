@@ -1,0 +1,8 @@
+The module is a flat collection of independent tooling utilities with no shared library — each subdirectory or top-level script is self-contained.
+
+- `tool_static_server.mjs` and `tool/serve_web.js` are two minimal Node HTTP servers that serve the built Flutter web bundle from `build/web/`; the former uses ESM + `fs/promises` and serves on `127.0.0.1:4173`, the latter uses CommonJS with CLI args for root/port and includes path-traversal protection.
+- `tool/generate_icons.py` is a standalone Python/Pillow/Numpy asset pipeline that reads a source logo and produces Android adaptive/legacy/monochrome icons, notification icons, iOS AppIcon set, and Play Store assets under `assets/icons`, `android/app/src/main/res`, and `ios/Runner/Assets.xcassets/AppIcon.appiconset`.
+- `tool/courier-orders/` is an npm package (`type: "module"`) depending on `mongodb` and `jsonwebtoken`; its `.mjs` scripts (`check-courier-queue.mjs`, `create-paid-orders.mjs`, `setup-fulfillment.mjs`, `stamp-delivery-distance.mjs`) interact with the courier partner API using HMAC-SHA256 signing and read secrets from a local `.env` (with `COURIER_PARTNER_ID`, `COURIER_PARTNER_SECRET`, `API_BASE`).
+- `tool/livecheck/` is a separate CJS npm package depending only on `puppeteer-core` for headless browser smoke tests.
+
+Dependency direction is one-way: all tools depend on external services (MongoDB, courier partner API, filesystem) but never on each other.

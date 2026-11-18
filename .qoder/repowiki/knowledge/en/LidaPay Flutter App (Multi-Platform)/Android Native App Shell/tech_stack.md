@@ -1,0 +1,1 @@
+Android Gradle Plugin 9.1.0, Kotlin JVM 17, Flutter Gradle plugin 1.0.0, Google Services plugin 4.4.2, desugaring JDK libs 2.1.4, Flutter embedding via `FlutterFragmentActivity`.

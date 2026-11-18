@@ -1,0 +1,1 @@
+OpenAPI 3.0 (`openapi.json`) consumed by Swagger UI at `/api-doc`; base URL `https://api.advansistechnologies.com` (production) and `http://localhost:1124` (development).

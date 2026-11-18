@@ -1,0 +1,1 @@
+iOS native wrapper for the Flutter app, wiring UIKit lifecycle, Google Maps, Firebase push notifications, and URL scheme handling into an Xcode workspace.

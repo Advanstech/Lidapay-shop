@@ -1,0 +1,3 @@
+- Scripts load environment variables from a sibling `.env` file by parsing key=value lines and populating `process.env` before reading them.
+- Each tool is packaged as an independent npm project with its own `package.json` and dependencies rather than sharing a monorepo dependency graph.
+- Static file servers normalize request paths via `decodeURIComponent` + `normalize`/`path.join` and fall back to serving `index.html` on any error.

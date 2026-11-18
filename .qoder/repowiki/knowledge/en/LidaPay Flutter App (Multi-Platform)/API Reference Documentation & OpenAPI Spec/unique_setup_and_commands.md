@@ -1,0 +1,1 @@
+The endpoint map header states it is regenerated from the running server's `/api-doc` swagger-ui bundle (`swagger-ui-init.js`), so updating `ENDPOINTS.md` requires re-running the extraction script against a live instance rather than editing manually.

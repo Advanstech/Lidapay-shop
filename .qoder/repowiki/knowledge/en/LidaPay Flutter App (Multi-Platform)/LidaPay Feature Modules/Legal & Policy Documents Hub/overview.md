@@ -1,0 +1,1 @@
+In-app legal hub that renders LidaPay's binding policy documents and tracks the user's versioned acceptance of the current policy set.

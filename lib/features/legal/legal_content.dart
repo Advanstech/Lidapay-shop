@@ -36,6 +36,7 @@ const companyAddress = 'Accra, Greater Accra, Ghana';
 Uri accountDeletionRequestUri({
   required String email,
   required String phoneNumber,
+  String? reason,
 }) => Uri(
   scheme: 'mailto',
   path: supportEmail,
@@ -44,7 +45,9 @@ Uri accountDeletionRequestUri({
     'body':
         'Please delete my LidaPay account and associated personal data.\n\n'
         'Registered email: $email\n'
-        'Registered phone: $phoneNumber\n\n'
+        'Registered phone: $phoneNumber\n'
+        '${reason != null && reason.trim().isNotEmpty ? 'Reason for leaving: ${reason.trim()}\n' : ''}'
+        '\n'
         'I understand some records may be retained where required by law.\n'
         'I have not included my password, payment PIN or one-time code.',
   },
@@ -52,7 +55,7 @@ Uri accountDeletionRequestUri({
 
 /// Bump when any binding document's text changes meaningfully — this is
 /// what the registration gate persists and the profile card compares.
-const kCurrentPolicyVersion = 3;
+const kCurrentPolicyVersion = 4;
 
 const privacyPolicy = PolicyDocument(
   id: 'privacy',
@@ -418,15 +421,16 @@ const accountDeletionPolicy = PolicyDocument(
   id: 'account-deletion',
   title: 'Account Deletion',
   subtitle: 'How to close your account and request data deletion',
-  updatedLabel: 'Last updated: November 2, 2026 · v3.0',
+  updatedLabel: 'Last updated: November 18, 2026 · v4.0',
   sections: [
     PolicySection(
       '1. Delete in the app',
       'Sign in to the account you want to delete, open Profile, select '
-          'Delete Account, review the notice and confirm. The app opens a '
-          'pre-filled deletion request addressed to support. Send the email '
-          'to submit your request; support may contact you to verify account '
-          'ownership before completing deletion.',
+          'Delete Account, enter a reason and confirm. The app opens a '
+          'pre-filled deletion request addressed to support that includes '
+          'your reason. Send the email to submit your request; support may '
+          'contact you to verify account ownership before completing '
+          'deletion.',
     ),
     PolicySection(
       '2. Before you delete',

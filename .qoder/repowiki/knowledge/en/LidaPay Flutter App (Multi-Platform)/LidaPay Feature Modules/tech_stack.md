@@ -1,0 +1,1 @@
+Flutter + Riverpod (`flutter_riverpod`) for reactive state, GoRouter for navigation, and a shared `core/network/api_client.dart` plus `core/network/token_store.dart` consumed by every feature's remote repository.

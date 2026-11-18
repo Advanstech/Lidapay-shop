@@ -1,0 +1,5 @@
+- Domain and state classes extend `Equatable` and override `props` to enable Riverpod's equality-based rebuilds.
+- Repository access goes through a single `historyRepositoryProvider` defined in `providers.dart`, so swapping between `RemoteHistoryRepository` and `MockHistoryRepository` is a one-line change.
+- Asynchronous data flows are wrapped in `AsyncValue` via `StateNotifierProvider` / `FutureProvider`, and UI branches on `loading` / `error` / `data` using `.when(...)` rather than manual Future checks.
+- Client-side filtering is applied over the merged `ActivityFeed` after fetching, with `HistoryFilter.matches` used as a predicate and `HistoryFilter.isActive` driving chip badges and empty states.
+- Chart widgets are self-contained `StatefulWidget`s or `StatelessWidget`s that take pre-aggregated lists/maps from `HistoryAnalytics` and render via `fl_chart`, keeping aggregation logic out of the UI layer.

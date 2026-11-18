@@ -1,6 +1,7 @@
 import '../../../core/constants/app_constants.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_endpoints.dart';
+import '../../../core/network/api_exception.dart';
 import '../../../core/network/api_payload.dart';
 import 'shop_models.dart';
 import 'shop_repository.dart';
@@ -108,6 +109,7 @@ class RemoteShopRepository implements ShopRepository {
     String paymentMethod = 'momo',
     double deliveryFee = 0,
     double? deliveryDistanceKm,
+    String? clientReference,
   }) async {
     final pool = payloadPool(
       asMap(
@@ -119,7 +121,13 @@ class RemoteShopRepository implements ShopRepository {
               'deliveryDistanceKm': deliveryDistanceKm,
             'paymentMethod': paymentMethod,
             'redirectUrl': AppConstants.shopCheckoutRedirectUrl,
+            // Idempotency key for this checkout attempt — the backend
+            // returns the same order when the same reference is replayed.
+            if (clientReference != null) 'clientReference': clientReference,
           },
+          headers: clientReference == null
+              ? null
+              : {'X-Idempotency-Key': clientReference},
         ),
       ),
     );
@@ -128,15 +136,13 @@ class RemoteShopRepository implements ShopRepository {
 
   @override
   Future<List<ShopOrder>> getOrders({int page = 1, int limit = 20}) async {
-    try {
-      final raw = await _api.getRaw(
-        ApiEndpoints.shopOrders,
-        queryParameters: {'page': page, 'limit': limit},
-      );
-      return rowsOf(raw).map((r) => _order(payloadPool(r))).toList();
-    } catch (_) {
-      return const [];
-    }
+    // A failed request must not look like "no orders" — the customer would
+    // think their order vanished. The failure propagates to the error state.
+    final raw = await _api.getRaw(
+      ApiEndpoints.shopOrders,
+      queryParameters: {'page': page, 'limit': limit},
+    );
+    return rowsOf(raw).map((r) => _order(payloadPool(r))).toList();
   }
 
   @override
@@ -146,8 +152,10 @@ class RemoteShopRepository implements ShopRepository {
         asMap(await _api.getRaw(ApiEndpoints.shopOrderById(id))),
       );
       return _order(pool);
-    } catch (_) {
-      return null;
+    } on ApiException catch (error) {
+      // A missing order is a real answer; a broken connection is not.
+      if (error.statusCode == 404) return null;
+      rethrow;
     }
   }
 
@@ -158,8 +166,9 @@ class RemoteShopRepository implements ShopRepository {
         asMap(await _api.getRaw(ApiEndpoints.shopOrderByNumber(orderNumber))),
       );
       return _order(pool);
-    } catch (_) {
-      return null;
+    } on ApiException catch (error) {
+      if (error.statusCode == 404) return null;
+      rethrow;
     }
   }
 

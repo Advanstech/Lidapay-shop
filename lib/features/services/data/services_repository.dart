@@ -82,10 +82,15 @@ abstract class ServicesRepository {
   /// POST /lida-value/use — debit the sender's Lida Value for their own
   /// airtime/data top-up. [destination] is the user's own Ghana number;
   /// [serviceType] is `AIRTIME` or `DATA`.
+  ///
+  /// [clientReference] is the idempotency reference for this debit attempt.
+  /// The same reference MUST be reused when the same purchase is retried so
+  /// the backend can return the previous result instead of debiting twice.
   Future<ServiceReceipt> useLidaValue({
     required double amount,
     required String destination,
     String serviceType = 'AIRTIME',
+    String? clientReference,
 
     /// Prymo network code for the delivery the debit purchases — sent in
     /// `metadata.network` per the Lida Value contract.
@@ -99,11 +104,15 @@ abstract class ServicesRepository {
   /// POST /lida-value/send — debit Lida Value to send airtime/data to
   /// [destination] (registered recipients get the delivery choice). For a
   /// pure value transfer the backend resolves the identifier itself.
+  ///
+  /// [clientReference] is the idempotency reference for this debit attempt —
+  /// the same reference MUST be reused when the same purchase is retried.
   Future<ServiceReceipt> sendLidaValue({
     required double amount,
     required String destination,
     String serviceType = 'AIRTIME',
     String? note,
+    String? clientReference,
   });
   Future<ServiceReceipt> sellLidaValue({
     required double amount,

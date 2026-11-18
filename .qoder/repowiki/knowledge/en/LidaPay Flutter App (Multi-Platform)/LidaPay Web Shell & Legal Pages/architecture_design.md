@@ -1,0 +1,5 @@
+The directory is a flat collection of static assets consumed by `flutter build web`:
+- `index.html` is the Flutter web shell; it injects `$FLUTTER_BASE_HREF` at build time via the `--base-href` argument, loads `flutter_bootstrap.js`, and wires up iOS meta tags, favicon, and the web manifest.
+- `manifest.json` declares the PWA (standalone display, portrait-primary orientation, LidaPay branding, four icon variants including maskable ones under `icons/`).
+- `legal.css` provides shared typography, layout, and theming for the five standalone HTML policy pages (`privacy-policy.html`, `terms-of-service.html`, `payments-refunds.html`, `kyc-anti-fraud.html`, `account-deletion.html`), which are not part of the Flutter SPA but are bundled and served by the same web server.
+- Dependency direction is one-way: the HTML/CSS/JS assets are emitted into the Flutter web build output and served statically; there is no application logic in this module.

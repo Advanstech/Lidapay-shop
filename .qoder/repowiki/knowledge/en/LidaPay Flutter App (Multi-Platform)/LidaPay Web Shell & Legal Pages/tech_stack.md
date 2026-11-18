@@ -1,0 +1,1 @@
+Plain HTML5 + CSS3 with CSS custom properties and modern layout features (`clamp`, `min()`, `gap`, `color-scheme`); Flutter web bootstrapping via `flutter_bootstrap.js`; PWA via W3C Web App Manifest.

@@ -1,0 +1,1 @@
+Flutter feature delivering the app's home dashboard — wallet summary, pending top-ups, services rail, flash deals carousel, and grouped recent activity feed.

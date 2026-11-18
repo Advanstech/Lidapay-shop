@@ -142,4 +142,13 @@ class ApiEndpoints {
       '/api/v1/recipient-decisions/$decisionId/respond';
   static String topupStatus(String topupOrderId) =>
       '/api/v1/topups/$topupOrderId/status';
+
+  /// App-version policy for the in-app update gate (`core/update`). The
+  /// client fails open when this route is missing, so the backend can ship it
+  /// whenever it is ready. Override at build time with
+  /// `--dart-define=APP_UPDATE_POLICY_PATH=/some/other/path`.
+  static const String appVersionPolicy = String.fromEnvironment(
+    'APP_UPDATE_POLICY_PATH',
+    defaultValue: '/api/v1/app/version',
+  );
 }

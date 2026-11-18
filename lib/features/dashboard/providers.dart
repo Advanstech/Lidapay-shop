@@ -166,12 +166,20 @@ final pendingRecipientTopupsProvider =
       final repo = ref.watch(recipient.recipientChoiceRepositoryProvider);
       final live = <String, TopupOrderStatus>{};
       var settled = false;
+      // The 4s cadence is only sustainable while the network answers.
+      // A round with no successful response backs off (4s → 60s) so an
+      // offline phone or a struggling backend is not hammered.
+      var backoff = const Duration(seconds: 4);
       while (ids.isNotEmpty) {
+        var anyAnswered = false;
         final entries = await Future.wait(
           ids.map((id) async {
             try {
-              return MapEntry(id, await repo.getTopupStatus(id));
+              final status = await repo.getTopupStatus(id);
+              anyAnswered = true;
+              return MapEntry(id, status);
             } on ApiException catch (e) {
+              if (e.statusCode != null) anyAnswered = true;
               // 404 = the ledger row is stale (order purged or never parked)
               // — blacklist it so it never re-seeds, and do NOT invalidate
               // the feed (the server-side row is stuck, a refetch changes
@@ -230,7 +238,12 @@ final pendingRecipientTopupsProvider =
         }
         yield live.values.toList();
         if (ids.isNotEmpty) {
-          await Future<void>.delayed(const Duration(seconds: 4));
+          await Future<void>.delayed(backoff);
+          backoff = anyAnswered
+              ? const Duration(seconds: 4)
+              : Duration(
+                  seconds: (backoff.inSeconds * 2).clamp(4, 60),
+                );
         }
       }
     });

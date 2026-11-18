@@ -1,0 +1,2 @@
+- Native code is kept minimal: the app has a single `MainActivity` subclassing `FlutterFragmentActivity` with no additional platform logic.
+- Secrets and per-machine paths are loaded from external properties files (`key.properties`, `local.properties`) rather than committed into the build script.

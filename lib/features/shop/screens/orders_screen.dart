@@ -178,7 +178,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
   }
 }
 
-/// Gradient header shared with Cart/Points — title, counts, live refresh.
+/// Light header shared with Cart — title, counts, live refresh.
 class _OrdersHero extends StatelessWidget {
   const _OrdersHero({
     required this.count,
@@ -192,48 +192,42 @@ class _OrdersHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       width: double.infinity,
       padding: EdgeInsets.fromLTRB(
-        22,
-        MediaQuery.paddingOf(context).top + 14,
-        22,
-        24,
+        20,
+        MediaQuery.paddingOf(context).top + 12,
+        20,
+        20,
       ),
-      decoration: const BoxDecoration(
-        gradient: AppColors.heroGradient,
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(30)),
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        border: Border(bottom: BorderSide(color: scheme.outlineVariant)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              IconButton(
-                onPressed: () => Navigator.of(context).pop(),
-                icon: const Icon(Icons.arrow_back_rounded),
-                color: Colors.white,
-                style: IconButton.styleFrom(
-                  backgroundColor: Colors.white.withValues(alpha: 0.15),
-                ),
+              _OrdersHeaderButton(
+                icon: Icons.arrow_back_rounded,
+                tooltip: 'Back',
+                onTap: () => Navigator.of(context).pop(),
               ),
               const Spacer(),
-              IconButton(
-                onPressed: onRefresh,
-                icon: const Icon(Icons.refresh_rounded),
-                color: Colors.white,
+              _OrdersHeaderButton(
+                icon: Icons.refresh_rounded,
                 tooltip: 'Refresh orders',
-                style: IconButton.styleFrom(
-                  backgroundColor: Colors.white.withValues(alpha: 0.15),
-                ),
+                onTap: onRefresh,
               ),
             ],
           ),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'My Orders',
             style: TextStyle(
-              color: Colors.white,
+              color: scheme.onSurface,
               fontSize: 26,
               fontWeight: FontWeight.w900,
               letterSpacing: -0.5,
@@ -246,12 +240,50 @@ class _OrdersHero extends StatelessWidget {
                 : '$count ${count == 1 ? 'order' : 'orders'}'
                       '${inTransit > 0 ? ' · $inTransit in transit' : ''}',
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.85),
+              color: scheme.onSurfaceVariant,
               fontSize: 13.5,
               fontWeight: FontWeight.w600,
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _OrdersHeaderButton extends StatelessWidget {
+  const _OrdersHeaderButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: scheme.outlineVariant),
+            ),
+            alignment: Alignment.center,
+            child: Icon(icon, color: scheme.onSurface, size: 20),
+          ),
+        ),
       ),
     );
   }
@@ -332,29 +364,18 @@ class _OrderCard extends ConsumerWidget {
         Icons.local_shipping_rounded,
         'In Transit',
       ),
-      'processing' || 'paid' => (
-        const Color(0xFFF2994A),
-        Icons.inventory_2_rounded,
-        'Processing',
-      ),
+      'processing' ||
+      'paid' => (AppColors.warning, Icons.inventory_2_rounded, 'Processing'),
       'cancelled' => (scheme.error, Icons.cancel_rounded, 'Cancelled'),
       _ => (scheme.onSurfaceVariant, Icons.schedule_rounded, 'Pending'),
     };
 
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? AppColors.darkSurface : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isDark ? Colors.white10 : const Color(0xFFECEAF2),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.22 : 0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: scheme.outlineVariant),
+        boxShadow: AppShadows.card(isDark),
       ),
       child: Material(
         color: Colors.transparent,
@@ -369,9 +390,8 @@ class _OrderCard extends ConsumerWidget {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Up to three product thumbnails — the first item's
-                    // name becomes the card title so the list reads like a
-                    // purchase, not a reference number.
+                    // The first item's image and name anchor the card; the
+                    // reference line carries the remaining item count.
                     if (order.items.isEmpty)
                       Container(
                         width: 46,
@@ -387,17 +407,7 @@ class _OrderCard extends ConsumerWidget {
                         ),
                       )
                     else
-                      Row(
-                        children: [
-                          for (var i = 0; i < order.items.length && i < 3; i++)
-                            Padding(
-                              padding: EdgeInsets.only(left: i == 0 ? 0 : 8),
-                              child: _OrderThumb(
-                                source: order.items[i].imageAsset,
-                              ),
-                            ),
-                        ],
-                      ),
+                      _OrderThumb(source: order.items.first.imageAsset),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
@@ -466,10 +476,7 @@ class _OrderCard extends ConsumerWidget {
                   ],
                 ),
                 const SizedBox(height: 14),
-                Divider(
-                  height: 1,
-                  color: isDark ? Colors.white10 : const Color(0xFFF0EEF5),
-                ),
+                Divider(height: 1, color: scheme.outlineVariant),
                 const SizedBox(height: 12),
                 Row(
                   children: [
@@ -630,71 +637,66 @@ class _OrderDetailSheet extends ConsumerWidget {
               ],
             ),
             const Divider(height: 28),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            const Text(
+              'Delivery Tracking',
+              style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                const Text(
-                  'Delivery Tracking',
-                  style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800),
-                ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _StatusPill(status: order.status),
-                    if (order.trackingNumber != null) ...[
-                      const SizedBox(width: 6),
-                      InkWell(
-                        borderRadius: BorderRadius.circular(8),
-                        onTap: () {
-                          Clipboard.setData(
-                            ClipboardData(text: order.trackingNumber!),
-                          );
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Tracking number copied'),
-                              duration: Duration(seconds: 2),
+                _StatusPill(status: order.status),
+                if (order.trackingNumber != null)
+                  Tooltip(
+                    message: 'Copy tracking number',
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(10),
+                      onTap: () {
+                        Clipboard.setData(
+                          ClipboardData(text: order.trackingNumber!),
+                        );
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Tracking number copied'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                      child: Container(
+                        height: 44,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: scheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 180),
+                              child: Text(
+                                '${order.carrier != null ? '${order.carrier} · ' : ''}${order.trackingNumber}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: scheme.onSurfaceVariant,
+                                ),
+                              ),
                             ),
-                          );
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: scheme.surfaceContainerHighest,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              ConstrainedBox(
-                                constraints: const BoxConstraints(
-                                  maxWidth: 150,
-                                ),
-                                child: Text(
-                                  '${order.carrier != null ? '${order.carrier} · ' : ''}${order.trackingNumber}',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: theme.textTheme.labelSmall?.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                    color: scheme.onSurfaceVariant,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              Icon(
-                                Icons.copy_rounded,
-                                size: 11,
-                                color: scheme.onSurfaceVariant,
-                              ),
-                            ],
-                          ),
+                            const SizedBox(width: 6),
+                            Icon(
+                              Icons.copy_rounded,
+                              size: 14,
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ],
                         ),
                       ),
-                    ],
-                  ],
-                ),
+                    ),
+                  ),
               ],
             ),
             const SizedBox(height: 12),

@@ -1,0 +1,9 @@
+schema_version: 1
+module_path: lib_features/services
+title: Services Feature (Airtime, Data, Lida Value & Rewards)
+scope:
+    - lib/features/services/
+source_files: []
+depends_on: []
+related_to:
+    - path: lib_features/payments

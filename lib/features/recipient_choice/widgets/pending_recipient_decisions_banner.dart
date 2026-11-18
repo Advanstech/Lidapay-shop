@@ -27,12 +27,17 @@ class _PendingRecipientDecisionsBannerState
     extends ConsumerState<PendingRecipientDecisionsBanner> {
   Timer? _ticker;
 
-  @override
-  void initState() {
-    super.initState();
-    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() {});
-    });
+  /// The 1s repaint exists only for the live countdown — run it only while
+  /// a banner is actually on screen, never while the section is hidden.
+  void _syncTicker(bool visible) {
+    if (visible && _ticker == null) {
+      _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) setState(() {});
+      });
+    } else if (!visible && _ticker != null) {
+      _ticker!.cancel();
+      _ticker = null;
+    }
   }
 
   @override
@@ -48,6 +53,7 @@ class _PendingRecipientDecisionsBannerState
     final active = decisions
         .where((d) => d.isPending && (d.expiresAt == null || d.expiresAt!.isAfter(now)))
         .toList();
+    _syncTicker(active.isNotEmpty);
     if (active.isEmpty) return const SizedBox.shrink();
 
     return Padding(

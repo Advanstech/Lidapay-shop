@@ -66,6 +66,19 @@ android {
     buildTypes {
         release {
             signingConfig = signingConfigs.getByName("release")
+            // Smaller, faster-to-load release APKs. Plugin rules ship in
+            // their AARs; app-specific keeps live in proguard-rules.pro.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
+            ndk {
+                // Native symbol table lets Play Console de-obfuscate engine
+                // crash reports; full debug info is not shipped.
+                debugSymbolLevel = "SYMBOL_TABLE"
+            }
         }
     }
 }

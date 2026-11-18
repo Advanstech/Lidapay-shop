@@ -32,11 +32,16 @@ abstract class ShopRepository {
   /// POST /api/v1/shop/checkout — creates a pending order from the server
   /// cart and calculates the server-side `deliveryFee` and `total`.
   /// The mobile client must not send a client-computed delivery fee.
+  ///
+  /// [clientReference] is the idempotency key for this checkout attempt —
+  /// the same reference must be reused when the same attempt is retried so
+  /// the backend returns the same order instead of creating a second one.
   Future<ShopOrder> checkout({
     required ShippingAddress shippingAddress,
     String paymentMethod = 'momo',
     double deliveryFee = 0,
     double? deliveryDistanceKm,
+    String? clientReference,
   });
 
   /// GET /api/v1/shop/orders — list current user's orders (paginated).

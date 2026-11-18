@@ -1,0 +1,237 @@
+# 知识卡导出索引文件
+schema_version: 1
+locale: en-US
+branch: main
+nodes_managed: true
+exported_at: "2026-11-18T15:46:24Z"
+modules:
+    "":
+        dir_name: LidaPay Flutter App (Multi-Platform)
+        title: LidaPay Flutter App (Multi-Platform)
+        scope:
+            - README.md
+            - pubspec.yaml
+            - analysis_options.yaml
+            - devtools_options.yaml
+            - .gitignore
+            - pubspec.lock
+        source_files: []
+        children:
+            - android_native
+            - api_docs
+            - ios_native
+            - lib_core
+            - lib_features
+            - tests
+            - tooling
+            - web_static
+        depends_on: []
+        related_to: []
+    android_native:
+        dir_name: Android Native App Shell
+        title: Android Native App Shell
+        scope:
+            - android/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    api_docs:
+        dir_name: API Reference Documentation & OpenAPI Spec
+        title: API Reference Documentation & OpenAPI Spec
+        scope:
+            - api/
+            - docs/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    ios_native:
+        dir_name: iOS Native App Wrapper (Runner)
+        title: iOS Native App Wrapper (Runner)
+        scope:
+            - ios/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    lib_core:
+        dir_name: Application Core & Cross-Cutting Infrastructure
+        title: Application Core & Cross-Cutting Infrastructure
+        scope:
+            - lib/core/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: lib_features/payments
+            - path: lib_features/recipient_choice
+    lib_features:
+        dir_name: LidaPay Feature Modules
+        title: LidaPay Feature Modules
+        scope:
+            - lib/features/
+        source_files: []
+        children:
+            - lib_features/auth
+            - lib_features/dashboard
+            - lib_features/history
+            - lib_features/legal
+            - lib_features/lida_value
+            - lib_features/notifications
+            - lib_features/payments
+            - lib_features/recipient_choice
+            - lib_features/services
+            - lib_features/shell_and_misc
+            - lib_features/shop
+            - lib_features/support
+        depends_on: []
+        related_to: []
+    lib_features/auth:
+        dir_name: Authentication & Account Management Feature
+        title: Authentication & Account Management Feature
+        scope:
+            - lib/features/auth/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    lib_features/dashboard:
+        dir_name: Dashboard Home Feature
+        title: Dashboard Home Feature
+        scope:
+            - lib/features/dashboard/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: lib_features/history
+    lib_features/history:
+        dir_name: Transaction History & Analytics Feature
+        title: Transaction History & Analytics Feature
+        scope:
+            - lib/features/history/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: lib_features/dashboard
+    lib_features/legal:
+        dir_name: Legal & Policy Documents Hub
+        title: Legal & Policy Documents Hub
+        scope:
+            - lib/features/legal/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    lib_features/lida_value:
+        dir_name: Lida Value Wallet Feature
+        title: Lida Value Wallet Feature
+        scope:
+            - lib/features/lida_value/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: lib_features/payments
+    lib_features/notifications:
+        dir_name: Notifications Center & Delivery Pipeline
+        title: Notifications Center & Delivery Pipeline
+        scope:
+            - lib/features/notifications/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    lib_features/payments:
+        dir_name: Payment Orchestration & Checkout Flow
+        title: Payment Orchestration & Checkout Flow
+        scope:
+            - lib/features/payments/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: lib_core
+            - path: lib_features/lida_value
+            - path: lib_features/services
+            - path: lib_features/shop
+    lib_features/recipient_choice:
+        dir_name: Recipient Choice & Parked Top-up Flow
+        title: Recipient Choice & Parked Top-up Flow
+        scope:
+            - lib/features/recipient_choice/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: lib_core
+    lib_features/services:
+        dir_name: Services Feature (Airtime, Data, Lida Value & Rewards)
+        title: Services Feature (Airtime, Data, Lida Value & Rewards)
+        scope:
+            - lib/features/services/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: lib_features/payments
+    lib_features/shell_and_misc:
+        dir_name: Shell Navigation, Splash & Onboarding Screens
+        title: Shell Navigation, Splash & Onboarding Screens
+        scope:
+            - lib/features/shell/
+            - lib/features/onboarding/
+            - lib/features/splash/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    lib_features/shop:
+        dir_name: Shop Catalog, Cart & Checkout Feature
+        title: Shop Catalog, Cart & Checkout Feature
+        scope:
+            - lib/features/shop/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: lib_features/payments
+    lib_features/support:
+        dir_name: Support Center & Help Content
+        title: Support Center & Help Content
+        scope:
+            - lib/features/support/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    tests:
+        dir_name: Flutter Widget & Unit Test Suite
+        title: Flutter Widget & Unit Test Suite
+        scope:
+            - test/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    tooling:
+        dir_name: Dev & Ops Tooling
+        title: Dev & Ops Tooling
+        scope:
+            - tool/
+            - tool_static_server.mjs
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    web_static:
+        dir_name: LidaPay Web Shell & Legal Pages
+        title: LidaPay Web Shell & Legal Pages
+        scope:
+            - web/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []

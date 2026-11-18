@@ -1,0 +1,1 @@
+Flutter + Riverpod (`StateNotifierProvider.autoDispose`, `ConsumerWidget`, `Consumer`) for state; `shared_preferences` for durable attempt persistence; `go_router` for navigation; `intl` for date formatting; `share_plus` for receipt sharing.

@@ -1,0 +1,1 @@
+Before building, run `flutter pub get` then `cd ios && pod install` so `Flutter/Generated.xcconfig` and `Pods/` are created. The Google Maps key must be set in `ios/Flutter/Local.xcconfig` under `GOOGLE_MAPS_API_KEY` (the file is gitignored) or as an Xcode build setting; leaving it empty disables the map pin and shows coordinates only.

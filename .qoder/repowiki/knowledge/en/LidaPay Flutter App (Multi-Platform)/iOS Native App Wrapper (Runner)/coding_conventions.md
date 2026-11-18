@@ -1,0 +1,2 @@
+- Native initialization hooks extend Flutter base classes (`FlutterAppDelegate`, `FlutterSceneDelegate`) rather than implementing raw UIKit delegates directly.
+- Sensitive runtime values such as `GOOGLE_MAPS_API_KEY` are read from `Bundle.main` / `Info.plist` at launch instead of being hard-coded, with a documented fallback path via `Local.xcconfig`.

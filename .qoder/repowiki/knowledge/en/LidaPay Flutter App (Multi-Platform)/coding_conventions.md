@@ -1,0 +1,3 @@
+- Cross-cutting infrastructure lives in `lib_core` and is imported by feature modules rather than duplicated inside `lib_features`.
+- Feature modules under `lib_features` share a single Riverpod provider graph wired through the shell's router.
+- Public-facing legal content (privacy, terms, payments, KYC, account deletion) is kept as static HTML in `web_static/` and linked from the Play Console store listing.

@@ -1,0 +1,9 @@
+schema_version: 1
+module_path: lib_features/history
+title: Transaction History & Analytics Feature
+scope:
+    - lib/features/history/
+source_files: []
+depends_on: []
+related_to:
+    - path: lib_features/dashboard

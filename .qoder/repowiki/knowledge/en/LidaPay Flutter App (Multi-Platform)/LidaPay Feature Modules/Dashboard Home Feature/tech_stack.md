@@ -1,0 +1,1 @@
+Flutter + Riverpod (`Provider`, `FutureProvider`, `StreamProvider.autoDispose`, `StateProvider`) for state management; `equatable` for value equality on domain models; `go_router` for navigation from the dashboard into Services/Shop/History.

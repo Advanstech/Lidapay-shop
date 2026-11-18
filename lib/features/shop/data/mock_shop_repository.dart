@@ -222,6 +222,7 @@ class MockShopRepository implements ShopRepository {
     String paymentMethod = 'momo',
     double deliveryFee = 0,
     double? deliveryDistanceKm,
+    String? clientReference,
   }) async {
     await Future<void>.delayed(const Duration(milliseconds: 1100));
     final cart = _buildCart();

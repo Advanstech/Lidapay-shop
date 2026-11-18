@@ -22,6 +22,7 @@ class HistoryState extends Equatable {
     required this.items,
     required this.hasMore,
     required this.filter,
+    this.loadMoreError,
   });
 
   final List<Transaction> items;
@@ -30,20 +31,28 @@ class HistoryState extends Equatable {
   /// Active advanced filter; [HistoryFilter.isActive] false = unfiltered.
   final HistoryFilter filter;
 
+  /// Why the next page failed — kept so the list can offer a retry instead
+  /// of silently stopping or retrying forever.
+  final Object? loadMoreError;
+
   HistoryState copyWith({
     List<Transaction>? items,
     bool? hasMore,
     HistoryFilter? filter,
+    Object? loadMoreError,
+    bool clearLoadMoreError = false,
   }) {
     return HistoryState(
       items: items ?? this.items,
       hasMore: hasMore ?? this.hasMore,
       filter: filter ?? this.filter,
+      loadMoreError:
+          clearLoadMoreError ? null : (loadMoreError ?? this.loadMoreError),
     );
   }
 
   @override
-  List<Object?> get props => [items, hasMore, filter];
+  List<Object?> get props => [items, hasMore, filter, loadMoreError];
 }
 
 final historyProvider =
@@ -136,6 +145,9 @@ class HistoryController extends StateNotifier<AsyncValue<HistoryState>> {
     final current = state.valueOrNull;
     if (current == null || !current.hasMore || _loadingMore) return;
     _loadingMore = true;
+    if (current.loadMoreError != null) {
+      state = AsyncData(current.copyWith(clearLoadMoreError: true));
+    }
     final next = await AsyncValue.guard(
       () => _repository.getTransactions(
         page: _page + 1,
@@ -144,16 +156,22 @@ class HistoryController extends StateNotifier<AsyncValue<HistoryState>> {
       ),
     );
     if (!mounted) return;
-    next.whenData((items) {
-      _page += 1;
-      final hasMore = items.length > _pageSize;
-      state = AsyncData(
-        current.copyWith(
-          items: [...current.items, ...items.take(_pageSize)],
-          hasMore: hasMore,
-        ),
-      );
-    });
+    state = next.when(
+      data: (items) {
+        _page += 1;
+        final latest = state.valueOrNull ?? current;
+        return AsyncData(
+          latest.copyWith(
+            items: [...latest.items, ...items.take(_pageSize)],
+            hasMore: items.length > _pageSize,
+            clearLoadMoreError: true,
+          ),
+        );
+      },
+      error: (error, _) =>
+          AsyncData(current.copyWith(loadMoreError: error, hasMore: true)),
+      loading: () => state,
+    );
     _loadingMore = false;
   }
 }

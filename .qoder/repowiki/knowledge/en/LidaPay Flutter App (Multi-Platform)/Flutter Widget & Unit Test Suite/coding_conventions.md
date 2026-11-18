@@ -1,0 +1,4 @@
+- Feature-specific fake repositories are implemented inline in `helpers/mock_app.dart` by implementing the production repository interfaces rather than extending them, returning fixed deterministic values.
+- Widget tests bootstrap the app through the shared `pumpMockApp(tester)` helper instead of constructing `LidapayApp` directly, so all repository providers stay overridden consistently.
+- Asynchronous UI transitions are stabilized with `tester.pumpAndSettle(const Duration(milliseconds: 100))` after user interactions, matching the mock repositories' simulated latency.
+- External services like deep links are stubbed by defining a small class implementing the same interface (e.g. `AppLinks`) and injecting it where needed, rather than mocking third-party packages.

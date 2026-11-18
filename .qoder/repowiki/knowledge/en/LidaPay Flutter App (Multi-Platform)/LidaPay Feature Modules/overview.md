@@ -1,0 +1,1 @@
+Top-level Flutter feature layer grouping domain-scoped modules (auth, dashboard, history, payments, shop, services, etc.) that share a Riverpod state graph and are framed by the shell navigation.

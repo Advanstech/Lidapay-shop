@@ -1,0 +1,6 @@
+- Riverpod providers expose both a class and a top-level `final XxxProvider = Provider<Xxx>(...)` instance, with defaults that throw or return safe fallbacks so production overrides are explicit.
+- Build-time configuration is read through `String.fromEnvironment('KEY', defaultValue: ...)` rather than hard-coded strings, enabling per-environment builds.
+- Sensitive data (access/refresh tokens, profiles) is stored via an abstract `SecretStore` backed by `flutter_secure_storage` in production and `MemorySecretStore` in tests, with a synchronous in-memory mirror to avoid I/O in hot paths.
+- Network errors from Dio are converted into domain exceptions via `ApiException.fromDio`, keeping callers free of transport-layer types.
+- Route paths are declared as static const members of `AppRoutes` and constructed via factory methods (e.g. `recipientDecision`, `orderDetail`) instead of string literals scattered across features.
+- Deep-link URIs are recognized by dedicated static predicates (`isPaymentReturn`, `isPasswordLink`) that parse scheme/host/path, and are then translated to internal routes via `passwordRouteFor` / `callbackRouteFor`.

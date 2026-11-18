@@ -1,0 +1,1 @@
+Swift/UIKit app targeting iOS 15.0, built with Xcode + CocoaPods; integrates Google Maps SDK and Firebase Cloud Messaging/Core/Installations; uses Flutter's implicit engine delegate pattern.

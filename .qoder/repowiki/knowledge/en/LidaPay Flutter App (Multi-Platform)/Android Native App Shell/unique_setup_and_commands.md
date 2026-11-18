@@ -1,0 +1,1 @@
+Requires `local.properties` with `flutter.sdk` set by `flutter create`; release builds need `key.properties` (storeFile/storePassword/keyAlias/keyPassword) pointing at `lidapay-upload.jks`. Google Maps key can be supplied via `-P GOOGLE_MAPS_API_KEY=...`, the `GOOGLE_MAPS_API_KEY` environment variable, or `local.properties` — evaluated in that priority order.

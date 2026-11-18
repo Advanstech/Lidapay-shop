@@ -351,6 +351,7 @@ class MockServicesRepository implements ServicesRepository {
     required double amount,
     required String destination,
     String serviceType = 'AIRTIME',
+    String? clientReference,
     int? network,
     String? dataCode,
   }) async {
@@ -369,6 +370,7 @@ class MockServicesRepository implements ServicesRepository {
     required String destination,
     String serviceType = 'AIRTIME',
     String? note,
+    String? clientReference,
   }) async {
     await Future<void>.delayed(_latency);
     return _receipt(

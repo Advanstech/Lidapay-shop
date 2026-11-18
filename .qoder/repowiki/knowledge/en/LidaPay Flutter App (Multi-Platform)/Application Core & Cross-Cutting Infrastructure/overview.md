@@ -1,0 +1,1 @@
+Cross-cutting Flutter foundation for the LidaPay app: HTTP client with token refresh, session persistence, routing, deep links, device identity, theme state, and shared widgets.

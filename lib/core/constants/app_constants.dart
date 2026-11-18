@@ -13,7 +13,27 @@ class AppConstants {
   static const Duration otpResendCooldown = Duration(minutes: 2);
 
   static const String appName = 'Lidapay';
-  static const String appVersion = '1.1.1';
+
+  /// Fallback only — the version reported to the backend and shown in the
+  /// profile comes from `PackageInfo` (see `DeviceIdentityLoader`). Keep this
+  /// in step with `pubspec.yaml` for the cases where the platform probe
+  /// fails.
+  static const String appVersion = '1.1.3';
+
+  /// Gateway domains the payment checkout page may be opened on. Empty
+  /// means any well-formed public HTTPS page (see `isLaunchableCheckoutUrl`).
+  /// Pin the list at build time once the backend confirms the gateway hosts:
+  /// `--dart-define=CHECKOUT_ALLOWED_HOSTS=example-gateway.com`.
+  static List<String> get checkoutAllowedHosts {
+    final raw = String.fromEnvironment('CHECKOUT_ALLOWED_HOSTS').trim();
+    if (raw.isEmpty) return const <String>[];
+    return raw
+        .split(',')
+        .map((host) => host.trim().toLowerCase())
+        .where((host) => host.isNotEmpty)
+        .toList(growable: false);
+  }
+
   static const String defaultCountryCode = 'GH';
   static const String defaultCurrency = 'GHS';
   static const String defaultLocale = 'en_GH';

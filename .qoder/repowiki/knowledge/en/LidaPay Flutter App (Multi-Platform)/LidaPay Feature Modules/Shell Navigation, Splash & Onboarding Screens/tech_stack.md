@@ -1,0 +1,1 @@
+Flutter Material widgets, `go_router` for declarative routing (`StatefulNavigationShell`, `GoRouter.of(context)`), `flutter_riverpod` for reading `authSessionProvider` and `pendingRecipientDecisionsProvider`, and `dart:async` timers for splash timing.

@@ -1,0 +1,1 @@
+Flutter + Riverpod (`StateNotifierProvider`, `FutureProvider`, `StateProvider`) for state; `shared_preferences` for persistent read-state; `equatable` for immutable notification models; Dio-based `ApiClient` behind the repository seam.

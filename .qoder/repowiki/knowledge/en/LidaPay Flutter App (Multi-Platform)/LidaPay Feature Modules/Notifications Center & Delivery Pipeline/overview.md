@@ -1,0 +1,1 @@
+Flutter feature that surfaces push/email/SMS/in-app notifications for the signed-in user, with local read/dismiss state, deduplication, and a swipe-to-delete detail sheet.

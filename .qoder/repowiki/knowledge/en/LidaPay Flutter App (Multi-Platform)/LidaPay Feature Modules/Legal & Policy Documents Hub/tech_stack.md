@@ -1,0 +1,1 @@
+Flutter Material widgets with Riverpod `AsyncNotifierProvider` for policy-acceptance state, `shared_preferences` for offline persistence, and `go_router` for navigation into the `/legal/:id` route.

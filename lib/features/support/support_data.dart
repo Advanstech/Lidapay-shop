@@ -264,6 +264,11 @@ const supportCategories = <SupportCategory>[
         icon: Icons.privacy_tip_rounded,
         route: '${AppRoutes.legal}/privacy',
       ),
+      SupportAction(
+        label: 'Read the deletion policy',
+        icon: Icons.person_remove_rounded,
+        route: '${AppRoutes.legal}/account-deletion',
+      ),
     ],
     faqs: [
       SupportFaq(
@@ -290,8 +295,10 @@ const supportCategories = <SupportCategory>[
       SupportFaq(
         question: 'Can I delete my account and data?',
         answer:
-            'Yes. Sign in, open Profile and select Delete Account. If you '
-            'cannot sign in, email support from your registered address. '
+            'Yes. Sign in, open Profile and select Delete Account, enter a '
+            'reason and confirm — the app emails a pre-filled request to '
+            'support. If you cannot sign in, email support from your '
+            'registered address. '
             'Withdraw or spend remaining balances first; some records may '
             'be retained where the law requires.',
       ),

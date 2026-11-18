@@ -262,10 +262,11 @@ class PendingPayment extends Equatable {
     PaymentMethod? method,
     String? partnerTransId,
     String? momoNumber,
+    String? clientReference,
   }) => PendingPayment(
     kind: kind,
     reference: reference,
-    clientReference: clientReference,
+    clientReference: clientReference ?? this.clientReference,
     payAmount: payAmount,
     payCurrency: payCurrency,
     deliverAmount: deliverAmount,

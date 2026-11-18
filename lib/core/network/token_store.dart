@@ -17,6 +17,11 @@ final tokenStoreProvider = Provider<TokenStore>((ref) {
   return TokenStore(ref.watch(sharedPrefsProvider));
 });
 
+/// Encrypted key/value backend shared by every provider that persists secret
+/// material (session tokens, the in-flight payment token). Overridden in
+/// `main()`; the default keeps secrets in memory only.
+final secretStoreProvider = Provider<SecretStore>((ref) => MemorySecretStore());
+
 /// Async key/value backend for secrets.
 abstract class SecretStore {
   Future<String?> read(String key);

@@ -81,102 +81,20 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Future<void> _deleteAccount() async {
-    // Deliberate two-step gate: a stray tap on "Delete Account" lands on the
-    // prominent "Keep my account" action — confirming requires a separate,
-    // explicitly-labelled destructive press on the bottom sheet.
-    final confirmed = await showModalBottomSheet<bool>(
+    // Reason-gated sheet: the user must type or pick a reason before the
+    // destructive "Request deletion" action unlocks. The collected reason is
+    // folded into the support email so agents get context up front.
+    final reason = await showModalBottomSheet<String>(
       context: context,
+      isScrollControlled: true,
       showDragHandle: true,
       backgroundColor: Theme.of(context).colorScheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
-      builder: (ctx) {
-        final scheme = Theme.of(ctx).colorScheme;
-        final text = Theme.of(ctx).textTheme;
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 4, 24, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 64,
-                  height: 64,
-                  decoration: BoxDecoration(
-                    color: AppColors.error.withValues(alpha: 0.14),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Icon(
-                    Icons.delete_forever_rounded,
-                    color: AppColors.error,
-                    size: 32,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Delete your account?',
-                  style: text.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  'This opens an email request to Advansis support — sending '
-                  'it requests account and personal-data deletion. Support may '
-                  'verify ownership before completing it, and some transaction '
-                  'records may be retained where the law requires. Withdraw or '
-                  'spend any remaining wallet balance first.',
-                  textAlign: TextAlign.center,
-                  style: text.bodyMedium?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                    height: 1.45,
-                  ),
-                ),
-                const SizedBox(height: 22),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 15),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                    ),
-                    onPressed: () => Navigator.of(ctx).pop(false),
-                    child: const Text(
-                      'Keep my account',
-                      style: TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.error,
-                      side: BorderSide(
-                        color: AppColors.error.withValues(alpha: 0.6),
-                      ),
-                      padding: const EdgeInsets.symmetric(vertical: 15),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                    ),
-                    onPressed: () => Navigator.of(ctx).pop(true),
-                    icon: const Icon(Icons.mail_outline_rounded, size: 18),
-                    label: const Text(
-                      'Continue to deletion request',
-                      style: TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+      builder: (_) => const _DeletionReasonSheet(),
     );
-    if (confirmed != true || !mounted || _isPreparingDeletionRequest) return;
+    if (reason == null || !mounted || _isPreparingDeletionRequest) return;
 
     setState(() => _isPreparingDeletionRequest = true);
     try {
@@ -184,7 +102,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       final email = user?.email ?? '';
       final phoneNumber = user?.phoneNumber ?? '';
       final launched = await launchUrl(
-        accountDeletionRequestUri(email: email, phoneNumber: phoneNumber),
+        accountDeletionRequestUri(
+          email: email,
+          phoneNumber: phoneNumber,
+          reason: reason,
+        ),
         mode: LaunchMode.externalApplication,
       );
       if (!mounted) return;
@@ -200,6 +122,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         await _showManualDeletionFallbackDialog(
           email: email,
           phoneNumber: phoneNumber,
+          reason: reason,
         );
       }
     } on PlatformException {
@@ -208,6 +131,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       await _showManualDeletionFallbackDialog(
         email: user?.email ?? '',
         phoneNumber: user?.phoneNumber ?? '',
+        reason: reason,
       );
     } finally {
       if (mounted) setState(() => _isPreparingDeletionRequest = false);
@@ -217,10 +141,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Future<void> _showManualDeletionFallbackDialog({
     required String email,
     required String phoneNumber,
+    String? reason,
   }) async {
     final requestUri = accountDeletionRequestUri(
       email: email,
       phoneNumber: phoneNumber,
+      reason: reason,
     );
     final requestBody = requestUri.queryParameters['body'] ?? '';
     final fullText =
@@ -479,6 +405,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 onTap: () => context.push(AppRoutes.legal),
               ),
             ),
+            SliverToBoxAdapter(
+              child: _BrandActionTile(
+                icon: Icons.delete_forever_rounded,
+                iconGradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFFF87171), Color(0xFFDC2626)],
+                ),
+                label: 'Delete Account',
+                subtitle: 'Permanently remove your account and personal data',
+                onTap: _isPreparingDeletionRequest ? () {} : _deleteAccount,
+              ),
+            ),
             const SliverToBoxAdapter(child: SizedBox(height: 16)),
             SliverToBoxAdapter(
               child: Padding(
@@ -518,31 +457,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           ),
                         ),
                       ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            const SliverToBoxAdapter(child: SizedBox(height: 12)),
-            SliverToBoxAdapter(
-              child: Center(
-                child: TextButton.icon(
-                  onPressed: _isPreparingDeletionRequest
-                      ? null
-                      : _deleteAccount,
-                  icon: const Icon(
-                    Icons.delete_forever_rounded,
-                    color: AppColors.error,
-                    size: 18,
-                  ),
-                  label: Text(
-                    _isPreparingDeletionRequest
-                        ? 'Opening email…'
-                        : 'Delete Account',
-                    style: TextStyle(
-                      color: AppColors.error,
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
@@ -1761,6 +1675,179 @@ class _KycRow extends StatelessWidget {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// Reason-gated deletion sheet — the destructive action stays disabled until
+/// the user types a reason or taps a suggestion chip. Returns the reason via
+/// Navigator.pop; null means cancelled.
+class _DeletionReasonSheet extends StatefulWidget {
+  const _DeletionReasonSheet();
+
+  static const suggestions = [
+    'I no longer use LidaPay',
+    'I have privacy concerns',
+    'Too many notifications or emails',
+    'Something did not work as expected',
+    'I created a duplicate account',
+    'Other reason',
+  ];
+
+  @override
+  State<_DeletionReasonSheet> createState() => _DeletionReasonSheetState();
+}
+
+class _DeletionReasonSheetState extends State<_DeletionReasonSheet> {
+  final _reasonController = TextEditingController();
+  final _reasonFocus = FocusNode();
+  bool _showSuggestions = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Suggestions surface the moment the field is touched; they stay visible
+    // so switching between field and chips never hides them mid-tap.
+    _reasonFocus.addListener(() {
+      if (_reasonFocus.hasFocus && !_showSuggestions) {
+        setState(() => _showSuggestions = true);
+      }
+    });
+    _reasonController.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _reasonController.dispose();
+    _reasonFocus.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
+    final canConfirm = _reasonController.text.trim().isNotEmpty;
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 4, 24, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    color: AppColors.error.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Icon(
+                    Icons.delete_forever_rounded,
+                    color: AppColors.error,
+                    size: 32,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Delete your account?',
+                textAlign: TextAlign.center,
+                style: text.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Deleting your account is permanent and cannot be undone. '
+                'Spend your wallet balance first — support may ask you to '
+                'verify your identity.',
+                textAlign: TextAlign.center,
+                style: text.bodyMedium?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                  height: 1.45,
+                ),
+              ),
+              const SizedBox(height: 18),
+              TextField(
+                controller: _reasonController,
+                focusNode: _reasonFocus,
+                maxLines: 2,
+                minLines: 1,
+                maxLength: 200,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: InputDecoration(
+                  labelText: 'Why are you leaving?',
+                  hintText: 'Tell us a reason (required)',
+                  counterText: '',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ),
+              if (_showSuggestions) ...[
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final suggestion in _DeletionReasonSheet.suggestions)
+                      ActionChip(
+                        label: Text(
+                          suggestion,
+                          style: const TextStyle(fontSize: 12.5),
+                        ),
+                        onPressed: () {
+                          if (suggestion == 'Other reason') {
+                            _reasonFocus.requestFocus();
+                          } else {
+                            _reasonController.text = suggestion;
+                            _reasonController.selection =
+                                TextSelection.collapsed(
+                                  offset: suggestion.length,
+                                );
+                          }
+                        },
+                      ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 18),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.error,
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: AppColors.error.withValues(
+                    alpha: 0.35,
+                  ),
+                  disabledForegroundColor: Colors.white70,
+                  padding: const EdgeInsets.symmetric(vertical: 15),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                onPressed: canConfirm
+                    ? () =>
+                          Navigator.of(context)
+                              .pop(_reasonController.text.trim())
+                    : null,
+                icon: const Icon(Icons.mail_outline_rounded, size: 18),
+                label: const Text(
+                  'Request account deletion',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel — keep my account'),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -9,6 +9,7 @@ import '../../core/network/api_client.dart';
 import '../../core/network/api_exception.dart';
 import '../../core/network/token_store.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/utils/url_guard.dart';
 import '../auth/data/auth_models.dart';
 import '../auth/providers.dart';
 import '../services/data/service_models.dart';
@@ -25,7 +26,10 @@ final paymentsRepositoryProvider = Provider<PaymentsRepository>(
 );
 
 final pendingPaymentStoreProvider = Provider<PendingPaymentStore>(
-  (ref) => PendingPaymentStore(ref.watch(sharedPrefsProvider)),
+  (ref) => PendingPaymentStore(
+    ref.watch(sharedPrefsProvider),
+    secrets: ref.watch(secretStoreProvider),
+  ),
 );
 
 /// Checkout-launch seam so tests can intercept `launchUrl`.
@@ -162,6 +166,12 @@ class PaymentSessionNotifier extends StateNotifier<PaymentSessionState> {
 
   PendingPayment? _pending;
   Future<void>? _verifying;
+  String? _verifyingReference;
+
+  /// Bumped whenever the in-flight purchase is abandoned or replaced, so a
+  /// verification still polling for the previous purchase cannot deliver
+  /// after the user cancels, resets, retries, or starts a new purchase.
+  int _generation = 0;
 
   /// Persisted in-flight purchase (survives process death).
   PendingPayment? get pendingPayment => _pending;
@@ -184,7 +194,9 @@ class PaymentSessionNotifier extends StateNotifier<PaymentSessionState> {
       }
       return false;
     }
+    _generation++;
     _verifying = null;
+    _verifyingReference = null;
     if (method == PaymentMethod.mobileMoney) {
       return _beginGtPay(draft, user, momoNumber ?? user.phoneNumber);
     }
@@ -220,7 +232,16 @@ class PaymentSessionNotifier extends StateNotifier<PaymentSessionState> {
       );
       await _store.save(_pending!);
 
-      final launched = await _launchCheckout(Uri.parse(initiation.checkoutUrl));
+      final checkoutUri = Uri.tryParse(initiation.checkoutUrl);
+      if (checkoutUri == null || !isLaunchableCheckoutUrl(checkoutUri)) {
+        state = PaymentSessionState(
+          phase: PaymentPhase.failed,
+          pending: _pending,
+          message: 'The payment page address was not valid. Please try again.',
+        );
+        return false;
+      }
+      final launched = await _launchCheckout(checkoutUri);
       if (!mounted) return true;
       if (!launched) {
         state = PaymentSessionState(
@@ -417,7 +438,9 @@ class PaymentSessionNotifier extends StateNotifier<PaymentSessionState> {
     final url = _pending?.checkoutUrl;
     if (url == null || url.isEmpty) return;
     try {
-      await _launchCheckout(Uri.parse(url));
+      final uri = Uri.tryParse(url);
+      if (uri == null || !isLaunchableCheckoutUrl(uri)) return;
+      await _launchCheckout(uri);
     } catch (_) {
       // Non-fatal: the pending payment stays in place for verification.
     }
@@ -430,16 +453,39 @@ class PaymentSessionNotifier extends StateNotifier<PaymentSessionState> {
     if (_pending == null) return;
     await _store.clear();
     _pending = null;
+    _generation++;
     _verifying = null;
+    _verifyingReference = null;
     if (!mounted) return;
     state = const PaymentSessionState();
   }
 
-  void reset() => state = const PaymentSessionState();
+  void reset() {
+    _generation++;
+    _verifying = null;
+    _verifyingReference = null;
+    state = const PaymentSessionState();
+  }
 
-  Future<void> _verifyThenCredit(PendingPayment pending) =>
-      _verifying ??= _doVerifyThenCredit(pending)
-          .whenComplete(() => _verifying = null);
+  /// Single-flight per purchase: a duplicated return/resume for the same
+  /// reference joins the running verification, while verifying a different
+  /// purchase supersedes (and abandons) the previous one instead of
+  /// piggybacking on its future.
+  Future<void> _verifyThenCredit(PendingPayment pending) {
+    final existing = _verifying;
+    if (existing != null && _verifyingReference == pending.reference) {
+      return existing;
+    }
+    _generation++;
+    _verifyingReference = pending.reference;
+    final future = _doVerifyThenCredit(pending).whenComplete(() {
+      if (_verifyingReference == pending.reference) {
+        _verifying = null;
+        _verifyingReference = null;
+      }
+    });
+    return _verifying = future;
+  }
 
   final int _queryAttempts;
   final Duration _queryDelay;
@@ -453,8 +499,9 @@ class PaymentSessionNotifier extends StateNotifier<PaymentSessionState> {
   final Duration _gtPayExpireAfter;
 
   Future<void> _doVerifyThenCredit(PendingPayment pending) async {
+    final generation = _generation;
     if (pending.method == PaymentMethod.mobileMoney) {
-      return _doVerifyGtPay(pending);
+      return _doVerifyGtPay(pending, generation);
     }
     final token = pending.token;
     if (token == null || token.isEmpty) {
@@ -480,8 +527,10 @@ class PaymentSessionNotifier extends StateNotifier<PaymentSessionState> {
     PaymentOutcome? lastOutcome;
     for (var attempt = 0; attempt < _queryAttempts; attempt++) {
       if (attempt > 0) await Future<void>.delayed(_queryDelay);
+      if (generation != _generation) return;
       try {
         final result = await _payments.queryTransaction(token);
+        if (generation != _generation) return;
         final outcome = result.outcome;
         if (outcome == PaymentOutcome.success) {
           await _credit(pending);
@@ -498,6 +547,7 @@ class PaymentSessionNotifier extends StateNotifier<PaymentSessionState> {
       }
     }
 
+    if (generation != _generation) return;
     if (lastOutcome == PaymentOutcome.failed) {
       await _store.clear();
       _pending = null;
@@ -525,7 +575,7 @@ class PaymentSessionNotifier extends StateNotifier<PaymentSessionState> {
   /// approves the MoMo prompt. PENDING is neither success nor failure; when
   /// the window closes the record stays pending and is re-checked on resume
   /// or via "I've approved".
-  Future<void> _doVerifyGtPay(PendingPayment pending) async {
+  Future<void> _doVerifyGtPay(PendingPayment pending, int generation) async {
     final transId = pending.partnerTransId;
     if (transId == null || transId.isEmpty) {
       if (mounted) {
@@ -560,12 +610,14 @@ class PaymentSessionNotifier extends StateNotifier<PaymentSessionState> {
     final maxAttempts = expired ? 1 : _gtPayPollAttempts;
     for (var attempt = 0; attempt < maxAttempts; attempt++) {
       if (attempt > 0) await Future<void>.delayed(_gtPayPollDelay);
+      if (generation != _generation) return;
       if (attempt > 0 && !DateTime.now().isBefore(expiresAt)) {
         expired = true;
         break;
       }
       try {
         final result = await _payments.gtPayStatus(transId);
+        if (generation != _generation) return;
         lastStatus = result.status;
         if (result.outcome == PaymentOutcome.success) {
           await _credit(pending);
@@ -587,7 +639,7 @@ class PaymentSessionNotifier extends StateNotifier<PaymentSessionState> {
     }
     expired = expired || !DateTime.now().isBefore(expiresAt);
 
-    if (!mounted) return;
+    if (generation != _generation || !mounted) return;
     final timedOut = expired && !sawFailure;
     state = PaymentSessionState(
       phase: PaymentPhase.awaitingCallback,
@@ -630,7 +682,11 @@ class PaymentSessionNotifier extends StateNotifier<PaymentSessionState> {
       }
       return false;
     }
+    // Abandon any status poll still using the previous PartnerTransId — the
+    // retry debits under a new one, so a stale poll must not report on it.
+    _generation++;
     _verifying = null;
+    _verifyingReference = null;
     return _beginGtPay(
       pending,
       user,

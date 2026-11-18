@@ -79,7 +79,11 @@ class _PendingTopupScreenState extends ConsumerState<PendingTopupScreen> {
     super.initState();
     _activeWaitingCtrl = ref.read(activeWaitingTopupOrderIdProvider.notifier);
     _syncWindow();
-    _ticker = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
+    // No window means no countdown band to track; the status provider still
+    // drives rebuilds when the transfer settles.
+    if (_hasWindow) {
+      _ticker = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
+    }
     Future<void>.microtask(() {
       if (!mounted) return;
       _activeWaitingCtrl.state = widget.pending.topupOrderId;
@@ -494,6 +498,14 @@ class _CountdownHeroState extends State<_CountdownHero> {
     super.initState();
     _tick();
     if (widget.window <= Duration.zero) _window = _remaining;
+    _startIfNeeded();
+  }
+
+  /// No window (or an already-closed one) renders a static label — run the
+  /// 1s clock only while there is actually something counting down.
+  void _startIfNeeded() {
+    final exp = widget.expiresAt;
+    if (exp == null || !exp.isAfter(DateTime.now())) return;
     _timer = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
   }
 
@@ -507,6 +519,10 @@ class _CountdownHeroState extends State<_CountdownHero> {
     final exp = widget.expiresAt;
     if (!mounted || exp == null) return;
     final r = exp.difference(DateTime.now());
+    if (r.isNegative) {
+      _timer?.cancel();
+      _timer = null;
+    }
     setState(() {
       _remaining = r.isNegative ? Duration.zero : r;
     });
@@ -1082,6 +1098,13 @@ class _SettleNoteState extends State<_SettleNote> {
   void initState() {
     super.initState();
     _tick();
+    _startIfNeeded();
+  }
+
+  /// The "closed" copy is static — tick only while the window is open.
+  void _startIfNeeded() {
+    final exp = widget.expiresAt;
+    if (exp == null || !exp.isAfter(DateTime.now())) return;
     _timer = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
   }
 
@@ -1095,6 +1118,10 @@ class _SettleNoteState extends State<_SettleNote> {
     final exp = widget.expiresAt;
     if (!mounted || exp == null) return;
     final r = exp.difference(DateTime.now());
+    if (r.isNegative) {
+      _timer?.cancel();
+      _timer = null;
+    }
     setState(() {
       _remaining = r.isNegative ? Duration.zero : r;
     });

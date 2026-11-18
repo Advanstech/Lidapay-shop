@@ -413,7 +413,7 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
                                   ),
                                   const SizedBox(height: 10),
                                   SizedBox(
-                                    height: 204,
+                                    height: 224,
                                     child: ListView.separated(
                                       scrollDirection: Axis.horizontal,
                                       padding: const EdgeInsets.symmetric(
@@ -468,7 +468,7 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
                                       crossAxisCount: 2,
                                       mainAxisSpacing: 14,
                                       crossAxisSpacing: 14,
-                                      childAspectRatio: 0.72,
+                                      childAspectRatio: 0.68,
                                     ),
                                 delegate: SliverChildBuilderDelegate(
                                   (context, index) => ProductCard(
@@ -513,7 +513,7 @@ class _ShopTopBar extends StatelessWidget {
         IconButton(
           onPressed: onBack,
           padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+          constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
           icon: const Icon(
             Icons.arrow_back_rounded,
             color: Colors.white,
@@ -545,8 +545,8 @@ class _ShopTopBar extends StatelessWidget {
         ),
         const SizedBox(width: 4),
         Container(
-          width: 42,
-          height: 42,
+          width: 44,
+          height: 44,
           decoration: BoxDecoration(
             color: Colors.white.withValues(alpha: 0.88),
             shape: BoxShape.circle,
@@ -706,7 +706,7 @@ class _HeroSlide extends StatelessWidget {
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF03E2F),
+                        color: Theme.of(context).colorScheme.primary,
                         borderRadius: BorderRadius.circular(18),
                       ),
                       child: Text(
@@ -821,14 +821,14 @@ class _HeroSlide extends StatelessWidget {
             // Halo disc: a soft white radial glow so transparent product art
             // sits on a complementary backdrop instead of hard gradient.
             SizedBox(
-              width: 190,
-              height: 240,
+              width: 150,
+              height: 220,
               child: Stack(
                 alignment: Alignment.center,
                 children: [
                   Container(
-                    width: 190,
-                    height: 190,
+                    width: 150,
+                    height: 150,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       gradient: RadialGradient(
@@ -842,8 +842,8 @@ class _HeroSlide extends StatelessWidget {
                     ),
                   ),
                   SizedBox(
-                    width: 168,
-                    height: 224,
+                    width: 140,
+                    height: 200,
                     child: product.imageAsset.isEmpty
                         ? Icon(
                             Icons.shopping_bag_outlined,

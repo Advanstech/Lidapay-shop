@@ -1,0 +1,1 @@
+Standalone development and operations scripts: static file servers for the Flutter web build, an icon generator for Android/iOS, courier-order queue utilities, and a Puppeteer-based live check.

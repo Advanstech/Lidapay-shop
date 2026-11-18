@@ -1,0 +1,6 @@
+Two complementary documentation artifacts live side-by-side:
+- `api/ENDPOINTS.md` is a flat, auto-generated (header notes "Spec extracted: 2026-09-29 from /api-doc (swagger-ui-init.js)") index of every HTTP verb + path mapped to its controller method, serving as the canonical contract surface.
+- `api/openapi.json` is the machine-readable OpenAPI 3.0 definition that powers the `/api-doc` swagger-ui page referenced in the header.
+- `docs/swagger-api-documentation.md` is the expanded human guide for frontend engineers, organized by domain (System/Diagnostics, Authentication, Device Tokens, Internet Data, Recipient Choice, AdvansisPay/AdGenie, GTBank GTPay, Shop) with full request/response JSON examples and security notes.
+- The remaining `docs/*.md` files are cross-team handoff documents (BACKEND_NOTIFICATION_TRIGGERS_HANDOFF, COURIER_API_PARTNER_HANDOFF_FRANK, GOOGLE_MAPS_SETUP, MOBILE_APP_REBUILD_HANDOFF, SHOP_API_MOBILE_HANDOFF) that document integration contracts between backend, mobile, courier, and Google Maps setup rather than REST endpoints.
+Dependency direction is one-way: these docs describe the running API; they contain no executable code and are not imported by the application.

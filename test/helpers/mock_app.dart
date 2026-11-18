@@ -2,6 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lidapay_app/app.dart';
 import 'package:lidapay_app/core/network/token_store.dart';
+import 'package:lidapay_app/core/update/app_update_repository.dart';
+import 'package:lidapay_app/core/update/providers.dart';
 import 'package:lidapay_app/features/auth/data/mock_auth_repository.dart';
 import 'package:lidapay_app/features/auth/providers.dart';
 import 'package:lidapay_app/features/dashboard/data/mock_dashboard_repository.dart';
@@ -134,6 +136,10 @@ Future<void> pumpMockApp(
     ProviderScope(
       overrides: [
         sharedPrefsProvider.overrideWithValue(prefs),
+        // The update gate must never reach the network from a widget test.
+        appUpdateRepositoryProvider.overrideWithValue(
+          const NoopAppUpdateRepository(),
+        ),
         authRepositoryProvider.overrideWithValue(MockAuthRepository()),
         dashboardRepositoryProvider.overrideWithValue(
           MockDashboardRepository(),
@@ -146,9 +152,7 @@ Future<void> pumpMockApp(
           services ?? MockServicesRepository(),
         ),
         shopRepositoryProvider.overrideWithValue(MockShopRepository()),
-        paymentsRepositoryProvider.overrideWithValue(
-          FakePaymentsRepository(),
-        ),
+        paymentsRepositoryProvider.overrideWithValue(FakePaymentsRepository()),
         recipientChoiceRepositoryProvider.overrideWithValue(
           FakeRecipientChoiceRepository(),
         ),

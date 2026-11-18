@@ -195,7 +195,31 @@ class _CountdownChipState extends State<_CountdownChip> {
   @override
   void initState() {
     super.initState();
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) => setState(() {}));
+    _startIfNeeded();
+  }
+
+  @override
+  void didUpdateWidget(covariant _CountdownChip oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.expiresAt != widget.expiresAt) {
+      _timer?.cancel();
+      _timer = null;
+      _startIfNeeded();
+    }
+  }
+
+  /// A deal that already ended shows a static label — no ticker needed.
+  void _startIfNeeded() {
+    if (widget.expiresAt.isBefore(DateTime.now())) return;
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      final ended = widget.expiresAt.isBefore(DateTime.now());
+      if (ended) {
+        _timer?.cancel();
+        _timer = null;
+      }
+      setState(() {});
+    });
   }
 
   @override

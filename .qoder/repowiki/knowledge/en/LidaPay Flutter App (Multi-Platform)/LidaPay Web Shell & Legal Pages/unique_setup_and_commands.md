@@ -1,0 +1,1 @@
+The base path is templated through the Flutter build flag `--base-href`, which replaces `$FLUTTER_BASE_HREF` in `index.html`'s `<base>` tag — serving from a subpath requires passing that flag to `flutter build web`.

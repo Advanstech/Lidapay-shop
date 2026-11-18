@@ -1,0 +1,6 @@
+- Request models extend `Equatable` and expose a `withDevice(...)` builder that merges device metadata (token, platform, deviceId, appVersion, locale) onto an existing request before serialization.
+- All network payloads go through explicit `toJson()` / `fromJson()` factories on request/response classes rather than passing raw maps between layers.
+- The repository layer is always consumed via the `AuthRepository` abstract type; concrete implementations (`RemoteAuthRepository`, `MockAuthRepository`) are selected through a single `Provider<AuthRepository>` binding.
+- User-facing errors are thrown as `ApiException` (often with a `code` field like `EMAIL_TAKEN`, `INVALID_CREDENTIALS`, `INVALID_OTP`) so screens can branch on error codes instead of message strings.
+- Screens are implemented as `ConsumerStatefulWidget` subclasses that call methods on `ref.read(authSessionProvider.notifier)` rather than holding local auth state, keeping session ownership centralized in `AuthNotifier`.
+- Long-running background work from the notifier uses `unawaited(...)` (e.g. `refreshProfile()`, `onAuthenticated()`) to avoid blocking the caller while still surfacing unhandled exceptions.

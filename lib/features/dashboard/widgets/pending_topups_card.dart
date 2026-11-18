@@ -27,12 +27,17 @@ class PendingTopupsCard extends ConsumerStatefulWidget {
 class _PendingTopupsCardState extends ConsumerState<PendingTopupsCard> {
   Timer? _ticker;
 
-  @override
-  void initState() {
-    super.initState();
-    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() {});
-    });
+  /// The 1s repaint exists only for the live countdown — run it only while
+  /// a card is actually on screen, never while the section is hidden.
+  void _syncTicker(bool visible) {
+    if (visible && _ticker == null) {
+      _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) setState(() {});
+      });
+    } else if (!visible && _ticker != null) {
+      _ticker!.cancel();
+      _ticker = null;
+    }
   }
 
   @override
@@ -44,7 +49,9 @@ class _PendingTopupsCardState extends ConsumerState<PendingTopupsCard> {
   @override
   Widget build(BuildContext context) {
     final statuses = ref.watch(pendingRecipientTopupsProvider).valueOrNull;
-    if (statuses == null || statuses.isEmpty) {
+    final visible = statuses != null && statuses.isNotEmpty;
+    _syncTicker(visible);
+    if (!visible) {
       return const SizedBox.shrink();
     }
 

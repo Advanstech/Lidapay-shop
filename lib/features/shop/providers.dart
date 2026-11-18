@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/network/api_client.dart';
 import '../../core/network/token_store.dart';
 import '../auth/providers.dart';
+import '../payments/data/pending_payment.dart';
 import 'data/shop_models.dart';
 import 'data/shop_repository.dart';
 import 'data/remote_shop_repository.dart';
@@ -233,17 +234,29 @@ class CartController extends StateNotifier<AsyncValue<Cart>> {
 
   final ShopRepository _repository;
 
+  /// The idempotency reference of the current checkout attempt — kept across
+  /// a failed attempt so a retry reuses it, and cleared when the cart
+  /// changes or an order is placed.
+  String? _checkoutReference;
+
   Future<void> load() async {
     state = const AsyncLoading();
-    state = await AsyncValue.guard(() => _repository.getCart());
+    final next = await AsyncValue.guard(() => _repository.getCart());
+    if (!mounted) return;
+    state = next;
   }
 
   /// Mutations keep the current cart on screen while the call runs —
   /// `AsyncLoading.copyWithPrevious` flips `isRefreshing` so buttons and
   /// quantity steppers disable/animate without skeleton-flashing.
   Future<void> _mutate(Future<Cart> Function() call) async {
+    // A changed cart is a different purchase — the checkout reference must
+    // not be reused for it.
+    _checkoutReference = null;
     state = const AsyncLoading<Cart>().copyWithPrevious(state);
-    state = await AsyncValue.guard(call);
+    final next = await AsyncValue.guard(call);
+    if (!mounted) return;
+    state = next;
   }
 
   Future<void> add(ShopProduct product, {int quantity = 1}) =>
@@ -262,19 +275,62 @@ class CartController extends StateNotifier<AsyncValue<Cart>> {
   /// Places the order and refreshes the (now empty) cart. Returns the placed
   /// order, or null on failure — the previous cart state is preserved so the
   /// caller can surface the error and let the user retry.
+  ///
+  /// When the request fails the order may still have been created (the
+  /// backend clears the cart when it does), so the attempt is reconciled
+  /// before reporting a failure: a timed-out checkout must never become two
+  /// orders.
   Future<ShopOrder?> checkout(
     ShippingAddress address, {
     String paymentMethod = 'momo',
     double? deliveryDistanceKm,
+    String? clientReference,
   }) async {
+    // The same attempt keeps the same idempotency reference, so a retry
+    // after a timeout cannot create a second order.
+    final reference = clientReference ?? _checkoutReference ?? newClientReference();
+    _checkoutReference = reference;
     try {
       final order = await _repository.checkout(
         shippingAddress: address,
         paymentMethod: paymentMethod,
         deliveryDistanceKm: deliveryDistanceKm,
+        clientReference: reference,
       );
-      state = AsyncData(await _repository.getCart());
+      _checkoutReference = null;
+      final cart = await _repository.getCart();
+      if (mounted) state = AsyncData(cart);
       return order;
+    } catch (_) {
+      final recovered = await _recoverCreatedOrder();
+      if (recovered != null) {
+        _checkoutReference = null;
+        final cart = await _repository.getCart();
+        if (mounted) state = AsyncData(cart);
+        return recovered;
+      }
+      return null;
+    }
+  }
+
+  /// Finds the order a failed checkout may already have created. The backend
+  /// empties the server cart when an order is placed, so an empty cart plus
+  /// a fresh unpaid order means the order exists and only the response was
+  /// lost.
+  Future<ShopOrder?> _recoverCreatedOrder() async {
+    try {
+      final cart = await _repository.getCart();
+      if (cart.items.isNotEmpty) return null;
+      final orders = await _repository.getOrders(page: 1, limit: 20);
+      final cutoff = DateTime.now().subtract(const Duration(minutes: 10));
+      for (final order in orders) {
+        if (order.placedAt.isAfter(cutoff) &&
+            order.paymentStatus != 'paid' &&
+            order.paymentStatus != 'success') {
+          return order;
+        }
+      }
+      return null;
     } catch (_) {
       return null;
     }

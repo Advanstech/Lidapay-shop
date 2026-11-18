@@ -9,6 +9,7 @@ import 'package:lidapay_app/core/network/api_client.dart';
 import 'package:lidapay_app/core/network/api_exception.dart';
 import 'package:lidapay_app/core/network/token_store.dart';
 import 'package:lidapay_app/features/dashboard/providers.dart';
+import 'package:lidapay_app/features/lida_value/data/lv_attempt_store.dart';
 import 'package:lidapay_app/features/lida_value/providers.dart';
 import 'package:lidapay_app/features/payments/data/pending_payment.dart';
 import 'package:lidapay_app/features/payments/providers.dart';
@@ -84,10 +85,11 @@ class _RecordingLidaServices extends MockServicesRepository {
     required double amount,
     required String destination,
     String serviceType = 'AIRTIME',
+    String? clientReference,
     int? network,
     String? dataCode,
   }) async {
-    calls.add('use:$destination:$amount:$serviceType');
+    calls.add('use:$destination:$amount:$serviceType:$clientReference');
     return _receipt('Lida Value used');
   }
 
@@ -97,8 +99,9 @@ class _RecordingLidaServices extends MockServicesRepository {
     required String destination,
     String serviceType = 'AIRTIME',
     String? note,
+    String? clientReference,
   }) async {
-    calls.add('send:$destination:$amount:$serviceType');
+    calls.add('send:$destination:$amount:$serviceType:$clientReference');
     return _receipt('USE_SEND');
   }
 
@@ -122,6 +125,7 @@ class _FailingDebitServices extends _RecordingLidaServices {
     required double amount,
     required String destination,
     String serviceType = 'AIRTIME',
+    String? clientReference,
     int? network,
     String? dataCode,
   }) async {
@@ -142,6 +146,30 @@ class _FailingDeliveryServices extends _RecordingLidaServices {
     calls.add('deliver-failed');
     throw const ApiException('Provider delivery failed.');
   }
+}
+
+/// A debit that times out — the wallet may or may not have been charged.
+class _TimeoutDebitServices extends _RecordingLidaServices {
+  @override
+  Future<ServiceReceipt> sendLidaValue({
+    required double amount,
+    required String destination,
+    String serviceType = 'AIRTIME',
+    String? note,
+    String? clientReference,
+  }) async {
+    calls.add('send:$destination:$amount:$serviceType:$clientReference');
+    throw const ApiException(
+      'The network did not respond in time.',
+      statusCode: 504,
+    );
+  }
+}
+
+Future<LvAttemptStore> _attemptStore() async {
+  SharedPreferences.setMockInitialValues({});
+  final prefs = await SharedPreferences.getInstance();
+  return LvAttemptStore(prefs);
 }
 
 void main() {
@@ -405,7 +433,7 @@ void main() {
   group('LidaValueTopupNotifier', () {
     test('USE is one backend call — never a second provider delivery', () async {
       final services = _RecordingLidaServices();
-      final notifier = LidaValueTopupNotifier(services);
+      final notifier = LidaValueTopupNotifier(services, await _attemptStore());
       final draft = PendingPayment.ghanaAirtime(
         reference: 'LDP-3',
         clientReference: 'LDP-test-rc-5',
@@ -422,13 +450,13 @@ void main() {
         serviceType: 'AIRTIME',
       );
       expect(notifier.state.phase, LidaTopupPhase.completed);
-      expect(services.calls, ['use:0244588584:10.0:AIRTIME']);
+      expect(services.calls, ['use:0244588584:10.0:AIRTIME:LDP-test-rc-5']);
       expect(services.calls.where((c) => c.startsWith('deliver')), isEmpty);
     });
 
     test('SEND debits then delivers without the self flag', () async {
       final services = _RecordingLidaServices();
-      final notifier = LidaValueTopupNotifier(services);
+      final notifier = LidaValueTopupNotifier(services, await _attemptStore());
       final draft = PendingPayment.ghanaAirtime(
         reference: 'LDP-4',
         clientReference: 'LDP-test-rc-6',
@@ -445,13 +473,13 @@ void main() {
         serviceType: 'AIRTIME',
       );
       expect(notifier.state.phase, LidaTopupPhase.completed);
-      expect(services.calls.first, 'send:0201234567:15.0:AIRTIME');
+      expect(services.calls.first, 'send:0201234567:15.0:AIRTIME:LDP-test-rc-6');
       expect(services.calls.last, contains(':false'));
     });
 
     test('a failed debit never reaches the delivery call', () async {
       final services = _FailingDebitServices();
-      final notifier = LidaValueTopupNotifier(services);
+      final notifier = LidaValueTopupNotifier(services, await _attemptStore());
       final draft = PendingPayment.ghanaAirtime(
         reference: 'LDP-5',
         clientReference: 'LDP-test-rc-7',
@@ -474,7 +502,7 @@ void main() {
 
     test('SEND delivery failure after debit keeps the debit reference', () async {
       final services = _FailingDeliveryServices();
-      final notifier = LidaValueTopupNotifier(services);
+      final notifier = LidaValueTopupNotifier(services, await _attemptStore());
       final draft = PendingPayment.ghanaAirtime(
         reference: 'LDP-6',
         clientReference: 'LDP-test-rc-8',
@@ -493,6 +521,125 @@ void main() {
       expect(notifier.state.phase, LidaTopupPhase.failed);
       expect(notifier.state.debitReference, isNotNull);
       expect(services.calls.first, startsWith('send:'));
+    });
+
+    test('a timed-out debit keeps the attempt so a retry reuses it', () async {
+      final services = _TimeoutDebitServices();
+      final store = await _attemptStore();
+      final notifier = LidaValueTopupNotifier(services, store);
+      final draft = PendingPayment.ghanaAirtime(
+        reference: 'LDP-9',
+        clientReference: 'LDP-test-rc-9',
+        amount: 10,
+        recipientNumber: '0201234567',
+        networkId: '4',
+        saveToLidaValue: false,
+        isSelfTopup: false,
+        orderDesc: 'send',
+      );
+      await notifier.execute(
+        draft: draft,
+        funding: ServiceFunding.lidaValueSend,
+        serviceType: 'AIRTIME',
+      );
+      expect(notifier.state.phase, LidaTopupPhase.failed);
+      expect(notifier.state.outcomeUnknown, isTrue);
+      // The attempt is kept on disk — the wallet may have been debited.
+      expect(store.load(), isNotNull);
+      expect(store.load()!.draft.clientReference, 'LDP-test-rc-9');
+    });
+
+    test('a retry of the same purchase reuses the idempotency reference',
+        () async {
+      final services = _TimeoutDebitServices();
+      final store = await _attemptStore();
+      final notifier = LidaValueTopupNotifier(services, store);
+      PendingPayment draftFor(String reference) => PendingPayment.ghanaAirtime(
+        reference: reference,
+        clientReference: 'LDP-test-rc-10',
+        amount: 10,
+        recipientNumber: '0201234567',
+        networkId: '4',
+        saveToLidaValue: false,
+        isSelfTopup: false,
+        orderDesc: 'send',
+      );
+      await notifier.execute(
+        draft: draftFor('LDP-10'),
+        funding: ServiceFunding.lidaValueSend,
+        serviceType: 'AIRTIME',
+      );
+      await notifier.execute(
+        draft: draftFor('LDP-10b'),
+        funding: ServiceFunding.lidaValueSend,
+        serviceType: 'AIRTIME',
+      );
+      // Both attempts carry the same reference, so the backend can dedupe.
+      expect(services.calls.first, contains('LDP-test-rc-10'));
+      expect(services.calls.last, contains('LDP-test-rc-10'));
+    });
+
+    test('an already debited purchase is never debited again', () async {
+      final services = _RecordingLidaServices();
+      final store = await _attemptStore();
+      final draft = PendingPayment.ghanaAirtime(
+        reference: 'LDP-11',
+        clientReference: 'LDP-test-rc-11',
+        amount: 10,
+        recipientNumber: '0201234567',
+        networkId: '4',
+        saveToLidaValue: false,
+        isSelfTopup: false,
+        orderDesc: 'send',
+      );
+      // Simulate a crash after the wallet was debited but before delivery.
+      await store.save(
+        LvAttempt(
+          draft: draft,
+          serviceType: 'AIRTIME',
+          debitReference: 'LV-DEBIT-1',
+          updatedAt: DateTime(2026),
+        ),
+      );
+      final notifier = LidaValueTopupNotifier(services, store);
+      await notifier.execute(
+        draft: draft,
+        funding: ServiceFunding.lidaValueSend,
+        serviceType: 'AIRTIME',
+      );
+      // No second debit — only the delivery runs.
+      expect(services.calls.where((c) => c.startsWith('send')), isEmpty);
+      expect(services.calls.where((c) => c.startsWith('deliver')), isNotEmpty);
+      expect(notifier.state.phase, LidaTopupPhase.completed);
+    });
+
+    test('a pending debit is finished on the next start', () async {
+      final services = _RecordingLidaServices();
+      final store = await _attemptStore();
+      final draft = PendingPayment.ghanaAirtime(
+        reference: 'LDP-12',
+        clientReference: 'LDP-test-rc-12',
+        amount: 10,
+        recipientNumber: '0201234567',
+        networkId: '4',
+        saveToLidaValue: false,
+        isSelfTopup: false,
+        orderDesc: 'send',
+      );
+      await store.save(
+        LvAttempt(
+          draft: draft,
+          serviceType: 'AIRTIME',
+          debitReference: 'LV-DEBIT-2',
+          updatedAt: DateTime(2026),
+        ),
+      );
+      final notifier = LidaValueTopupNotifier(services, store);
+      await notifier.resumePendingDelivery();
+      expect(services.calls.where((c) => c.startsWith('send')), isEmpty);
+      expect(services.calls.where((c) => c.startsWith('deliver')), isNotEmpty);
+      expect(notifier.state.phase, LidaTopupPhase.completed);
+      expect(store.load(), isNull);
     });
   });
 

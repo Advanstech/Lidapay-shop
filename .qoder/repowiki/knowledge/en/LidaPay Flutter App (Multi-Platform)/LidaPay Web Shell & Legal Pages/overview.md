@@ -1,0 +1,1 @@
+Flutter web entry point and static legal pages (privacy, terms, payments, KYC, account deletion) served alongside the Flutter app as a PWA.

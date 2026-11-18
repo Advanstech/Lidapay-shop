@@ -1,0 +1,4 @@
+- Policy documents are declared as top-level `const PolicyDocument` values with a stable `id` string, then aggregated into the `allPolicyDocuments` list so screens iterate over a single source of truth.
+- The global `kCurrentPolicyVersion` constant is bumped whenever any binding document's text changes materially; screens and the notifier both compare persisted versions against this single value to decide whether re-acceptance is required.
+- Each policy body is split into `PolicySection` entries with a numbered heading and paragraph body, giving the renderer a uniform section layout across Privacy, Terms, Payments & Refunds, KYC, Account Deletion, and About pages.
+- Support contact details (email, phone, company name/address) are centralized as file-level `const` variables and interpolated into both the account-deletion mailto builder and the 'Contact Us' sections of multiple policies.

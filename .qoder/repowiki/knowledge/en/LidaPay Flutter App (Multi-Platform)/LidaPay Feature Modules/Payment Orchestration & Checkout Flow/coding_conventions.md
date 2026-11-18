@@ -1,0 +1,5 @@
+- Long-running operations go through a `StateNotifier` whose state is a small immutable `PaymentSessionState` record updated only via explicit phase transitions defined in the `PaymentPhase` enum.
+- External dependencies (HTTP calls, URL launching, persistent storage) are injected as Riverpod providers so callers depend on abstractions like `PaymentsRepository` rather than concrete implementations.
+- Durable domain objects expose kind-specific named factory constructors (e.g. `PendingPayment.ghanaAirtime`, `PendingPayment.globalData`) that populate a shared `params` map instead of ad-hoc fields.
+- Sensitive fields are separated from the persisted JSON payload — they are written to `SecretStore` under dedicated keys and stripped from the SharedPreferences record before serialization.
+- Concurrent access is guarded by a monotonically increasing `_generation` counter checked at every async boundary, allowing a new purchase to invalidate in-flight polls of the previous one.

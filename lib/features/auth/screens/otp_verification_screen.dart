@@ -76,6 +76,9 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
   }
 
   Future<void> _submit() async {
+    // The last digit auto-submits; a paste or a double tap must not send the
+    // same code twice.
+    if (_loading) return;
     final validationError = Validators.otp(_code);
     if (validationError != null) {
       setState(() => _error = validationError);
@@ -91,11 +94,13 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
           .verifyOtp(widget.username, _code);
       if (mounted) context.go(AppRoutes.home);
     } on ApiException catch (e) {
-      setState(() => _error = e.message);
-      for (final c in _controllers) {
-        c.clear();
+      if (mounted) {
+        setState(() => _error = e.message);
+        for (final c in _controllers) {
+          c.clear();
+        }
+        _focusNodes[0].requestFocus();
       }
-      _focusNodes[0].requestFocus();
     } finally {
       if (mounted) setState(() => _loading = false);
     }

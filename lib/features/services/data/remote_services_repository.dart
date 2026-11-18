@@ -1350,6 +1350,7 @@ class RemoteServicesRepository implements ServicesRepository {
     required double amount,
     required String destination,
     String serviceType = 'AIRTIME',
+    String? clientReference,
     int? network,
     String? dataCode,
   }) async {
@@ -1361,6 +1362,10 @@ class RemoteServicesRepository implements ServicesRepository {
         'destination': phone,
         'phoneNumber': phone,
         'serviceType': serviceType,
+        // Idempotency reference for this debit attempt. The backend dedupes
+        // on it, so a retried debit returns the first result instead of
+        // taking the customer's wallet twice.
+        if (clientReference != null) 'clientReference': clientReference,
         // Contract: `metadata.network` (Prymo code) + `metadata.productType`
         // drive the delivery the wallet debit purchases.
         'metadata': {
@@ -1369,6 +1374,9 @@ class RemoteServicesRepository implements ServicesRepository {
           if (serviceType.toUpperCase() == 'DATA') 'dataCode': ?dataCode,
         },
       },
+      headers: clientReference == null
+          ? null
+          : {'X-Idempotency-Key': clientReference},
     );
     return _receipt(
       raw,
@@ -1386,6 +1394,7 @@ class RemoteServicesRepository implements ServicesRepository {
     required String destination,
     String serviceType = 'AIRTIME',
     String? note,
+    String? clientReference,
   }) async {
     final target = destination.trim();
     final raw = await _api.postRaw(
@@ -1395,9 +1404,13 @@ class RemoteServicesRepository implements ServicesRepository {
         'destination': target,
         'recipientPhone': target,
         'serviceType': serviceType,
+        if (clientReference != null) 'clientReference': clientReference,
         if (note != null && note.trim().isNotEmpty)
           'metadata': {'message': note.trim()},
       },
+      headers: clientReference == null
+          ? null
+          : {'X-Idempotency-Key': clientReference},
     );
     return _receipt(
       raw,

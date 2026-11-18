@@ -1,0 +1,5 @@
+- Repository implementations are selected through a single `Provider<NotificationsRepository>` so the live API client can be swapped for `MockNotificationsRepository` without touching callers.
+- User-scoped persistence keys are derived from the active `UserProfile` via `_userStorageKey`, falling back to `'anon'` when no user is present, and read-state keys include a set of legacy email/phone/username variants for migration.
+- API payloads are normalized through `AppNotification.fromApiJson` using `payloadPool` and `stringField`/`dateField` helpers that try multiple candidate key names rather than assuming a fixed shape.
+- UI actions first mutate local state (optimistic mark-read / dismiss) and then call the repository, rolling back the optimistic change on server error.
+- Notification display text goes through `displayTitle` / `displayMessage` which strip embedded JSON tails and derive human-friendly copy from `kind` when the server payload is thin.

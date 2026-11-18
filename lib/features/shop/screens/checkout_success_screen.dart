@@ -50,24 +50,31 @@ class CheckoutSuccessScreen extends ConsumerWidget {
             ),
             child: Column(
               children: [
-                Container(
-                  width: 66,
-                  height: 66,
-                  decoration: BoxDecoration(
-                    gradient: AppColors.brandGradient,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primary.withValues(alpha: 0.38),
-                        blurRadius: 24,
-                        offset: const Offset(0, 8),
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.check_rounded,
-                    color: Colors.white,
-                    size: 36,
+                TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0.72, end: 1),
+                  duration: const Duration(milliseconds: 620),
+                  curve: Curves.easeOutBack,
+                  builder: (context, scale, child) =>
+                      Transform.scale(scale: scale, child: child),
+                  child: Container(
+                    width: 66,
+                    height: 66,
+                    decoration: BoxDecoration(
+                      gradient: AppColors.brandGradient,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withValues(alpha: 0.38),
+                          blurRadius: 24,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.check_rounded,
+                      color: Colors.white,
+                      size: 36,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 14),
@@ -133,7 +140,9 @@ class CheckoutSuccessScreen extends ConsumerWidget {
                           value: Formatters.currency(order.deliveryFee!),
                         ),
                       ],
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 12),
+                      Divider(height: 1, color: scheme.outlineVariant),
+                      const SizedBox(height: 12),
                       _OrderRow(
                         label: 'Total Paid',
                         value: Formatters.currency(order.total),
@@ -236,8 +245,8 @@ class CheckoutSuccessScreen extends ConsumerWidget {
                       Expanded(
                         child: Text(
                           'Fulfilment and delivery are arranged by the '
-                          'fulfilling shop. Follow progress and courier '
-                          'updates in My Orders.',
+                          'shop. Follow progress and courier updates in '
+                          'My Orders.',
                           style: TextStyle(
                             fontSize: 12.5,
                             height: 1.4,

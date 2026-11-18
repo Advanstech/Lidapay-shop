@@ -1,0 +1,1 @@
+Top-level Flutter screens that frame the app: a floating dock-based bottom navigation shell, a cold-start splash with animated branding, and an art-led onboarding carousel.

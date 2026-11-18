@@ -1,0 +1,3 @@
+- Endpoint entries in `ENDPOINTS.md` follow a fixed `METHOD /path — short description` line format, grouped implicitly by resource path prefix.
+- Handoff documents in `docs/` use an all-caps title followed by a descriptive subtitle and are authored as Markdown guides targeting a specific integration partner (mobile app, courier, Google Maps, notification triggers).
+- Request/response examples in `swagger-api-documentation.md` are presented as fenced JSON blocks under per-endpoint sections titled with the HTTP verb and path.

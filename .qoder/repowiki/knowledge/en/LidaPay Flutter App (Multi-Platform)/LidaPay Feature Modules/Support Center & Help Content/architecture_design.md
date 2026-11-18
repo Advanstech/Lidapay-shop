@@ -1,0 +1,6 @@
+Three-layer layout inside a single feature package:
+- Data layer (`support_data.dart`): immutable `SupportCategory`, `SupportFaq`, and `SupportAction` value objects plus the top-level `supportCategories` list. It also exposes `allFaqs()` for search flattening, `supportEmailUri` / `supportPhoneUri` helpers that build `mailto:`/`tel:` URIs, and `supportCategoryById` lookup.
+- Screen layer (`screens/`): `SupportScreen` is the search-first home (sticky header + grid of category cards + curated popular picks); `SupportCategoryScreen` renders a single category's "Try this first" deep links followed by expandable FAQ tiles. Both navigate via `go_router` string routes under `AppRoutes.support`.
+- Widget layer (`widgets/support_widgets.dart`): reusable presentational components — `FaqSearchTile`, `FaqExpansionTile`, `SupportContactCard`, `LegalRowTile`, `_ChannelButton` — consumed by both screens.
+
+Dependency direction is strictly data → widgets → screens; screens depend on `core/router/app_router.dart`, `core/theme/app_theme.dart`, and `core/widgets/sticky_header.dart`, while data depends only on `legal/legal_content.dart` for the raw email/phone constants. There is no state management or service layer — content is static and curated in code.

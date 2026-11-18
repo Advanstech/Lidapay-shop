@@ -196,7 +196,10 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
                               Container(
                                 padding: const EdgeInsets.symmetric(
@@ -204,9 +207,7 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                                   vertical: 6,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: isDark
-                                      ? AppColors.darkInput
-                                      : const Color(0xFFF1F1F4),
+                                  color: scheme.surfaceContainerHighest,
                                   borderRadius: BorderRadius.circular(14),
                                 ),
                                 child: Text(
@@ -218,7 +219,6 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 8),
                               Container(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 10,
@@ -247,8 +247,8 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                                     const SizedBox(width: 5),
                                     Text(
                                       product.inStock
-                                          ? 'In Stock (${product.stock})'
-                                          : 'Out of Stock',
+                                          ? 'In stock (${product.stock})'
+                                          : 'Out of stock',
                                       style: TextStyle(
                                         fontSize: 11.5,
                                         fontWeight: FontWeight.w800,
@@ -260,7 +260,6 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                                   ],
                                 ),
                               ),
-                              const Spacer(),
                               if (discount > 0)
                                 Container(
                                   padding: const EdgeInsets.symmetric(
@@ -268,13 +267,15 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                                     vertical: 6,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFFCE8E6),
+                                    color: AppColors.primary.withValues(
+                                      alpha: 0.12,
+                                    ),
                                     borderRadius: BorderRadius.circular(14),
                                   ),
                                   child: Text(
                                     '$discount% OFF',
                                     style: const TextStyle(
-                                      color: Color(0xFFE8432E),
+                                      color: AppColors.primary,
                                       fontSize: 12,
                                       fontWeight: FontWeight.w800,
                                     ),
@@ -310,7 +311,7 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        'Promo Price',
+                                        discount > 0 ? 'Promo price' : 'Price',
                                         style: TextStyle(
                                           fontSize: 13,
                                           color: scheme.onSurfaceVariant,
@@ -368,7 +369,7 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                                       Text(
                                         'GHS ${savings.toStringAsFixed(2)}',
                                         style: const TextStyle(
-                                          color: Color(0xFF33B457),
+                                          color: AppColors.success,
                                           fontSize: 18,
                                           fontWeight: FontWeight.w800,
                                         ),
@@ -536,19 +537,26 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                                             ),
                                       ),
                                       const SizedBox(height: 12),
-                                      GestureDetector(
+                                      InkWell(
                                         onTap: () => setState(
                                           () => _expandedDescription =
                                               !_expandedDescription,
                                         ),
-                                        child: Text(
-                                          _expandedDescription
-                                              ? 'Show Less'
-                                              : 'Read More',
-                                          style: const TextStyle(
-                                            color: AppColors.primary,
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 14,
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: SizedBox(
+                                          height: 44,
+                                          child: Align(
+                                            alignment: Alignment.centerLeft,
+                                            child: Text(
+                                              _expandedDescription
+                                                  ? 'Show less'
+                                                  : 'Read more',
+                                              style: const TextStyle(
+                                                color: AppColors.primary,
+                                                fontWeight: FontWeight.w700,
+                                                fontSize: 14,
+                                              ),
+                                            ),
                                           ),
                                         ),
                                       ),
@@ -601,6 +609,7 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
               ),
               decoration: BoxDecoration(
                 color: cardBg,
+                border: Border(top: BorderSide(color: borderColor)),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.06),
@@ -867,20 +876,22 @@ class _CircleHeaderButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 42,
-        height: 42,
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.9),
-          shape: BoxShape.circle,
-        ),
-        alignment: Alignment.center,
-        child: Badge(
-          isLabelVisible: badgeCount > 0,
-          label: Text('$badgeCount'),
-          child: Icon(icon, color: iconColor, size: 22),
+    return Material(
+      color: Colors.white.withValues(alpha: 0.94),
+      shape: const CircleBorder(),
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: SizedBox(
+          width: 44,
+          height: 44,
+          child: Center(
+            child: Badge(
+              isLabelVisible: badgeCount > 0,
+              label: Text('$badgeCount'),
+              child: Icon(icon, color: iconColor, size: 22),
+            ),
+          ),
         ),
       ),
     );
@@ -937,6 +948,7 @@ class _SpecRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
@@ -945,12 +957,15 @@ class _SpecRow extends StatelessWidget {
             fontWeight: FontWeight.w600,
           ),
         ),
-        const Spacer(),
-        Text(
-          value,
-          style: TextStyle(
-            color: scheme.onSurface,
-            fontWeight: FontWeight.w700,
+        const SizedBox(width: 16),
+        Expanded(
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            style: TextStyle(
+              color: scheme.onSurface,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
       ],
@@ -1015,7 +1030,7 @@ class _RelatedProductTile extends StatelessWidget {
                             vertical: 3,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFE8432E),
+                            color: AppColors.primary,
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(

@@ -1,0 +1,1 @@
+`flutter pub get` → `flutter analyze` → `flutter test` validates the whole repo; `flutter build appbundle --release` produces the signed Play bundle from `android/app/outputs/bundle/release/app-release.aab`, reading signing keys from `android/key.properties`. The version number after `+` in `pubspec.yaml` must be bumped before every new Play release.

@@ -93,13 +93,13 @@ class DashboardScreen extends ConsumerWidget {
     return Scaffold(
       body: RefreshIndicator(
         onRefresh: () => _refresh(ref),
-        edgeOffset: topInset + 76,
+        edgeOffset: topInset + 84,
         child: CustomScrollView(
           slivers: [
             SliverPersistentHeader(
               pinned: true,
               delegate: StickySliverHeaderDelegate(
-                height: topInset + 74,
+                height: topInset + 82,
                 builder: (context, isStuck) => DecoratedBox(
                   decoration: BoxDecoration(
                     color: Theme.of(context).scaffoldBackgroundColor,
@@ -333,6 +333,8 @@ class _Header extends StatelessWidget {
               ),
               Text(
                 'Your money, at a glance.',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.bodySmall
                     ?.copyWith(color: scheme.onSurfaceVariant),
               ),

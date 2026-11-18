@@ -11,6 +11,7 @@ import 'core/notifications/push_notification_service.dart';
 import 'core/providers/theme_provider.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
+import 'core/update/widgets/app_update_gate.dart';
 import 'features/auth/providers.dart';
 import 'features/dashboard/providers.dart';
 import 'features/history/providers.dart';
@@ -119,7 +120,9 @@ class _LidapayAppState extends ConsumerState<LidapayApp>
       unawaited(ref.read(authSessionProvider.notifier).refreshProfile());
       if (ref.read(hasSessionProvider)) {
         unawaited(ref.read(pushNotificationServiceProvider).syncDeviceToken());
-        unawaited(ref.read(pendingRecipientDecisionsProvider.notifier).refresh());
+        unawaited(
+          ref.read(pendingRecipientDecisionsProvider.notifier).refresh(),
+        );
       }
     }
   }
@@ -173,7 +176,8 @@ class _LidapayAppState extends ConsumerState<LidapayApp>
       );
     });
 
-    final isDark = themeMode == ThemeMode.dark ||
+    final isDark =
+        themeMode == ThemeMode.dark ||
         (themeMode == ThemeMode.system &&
             MediaQuery.platformBrightnessOf(context) == Brightness.dark);
 
@@ -184,8 +188,9 @@ class _LidapayAppState extends ConsumerState<LidapayApp>
       statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
       statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
       systemNavigationBarColor: Colors.transparent,
-      systemNavigationBarIconBrightness:
-          isDark ? Brightness.light : Brightness.dark,
+      systemNavigationBarIconBrightness: isDark
+          ? Brightness.light
+          : Brightness.dark,
       systemNavigationBarContrastEnforced: false,
     );
 
@@ -202,10 +207,12 @@ class _LidapayAppState extends ConsumerState<LidapayApp>
         routerConfig: router,
         builder: (context, child) {
           // Automatic keyboard dismissal on outside tap (smooth redrawal)
-          final content = GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-            child: child ?? const SizedBox.shrink(),
+          final content = AppUpdateGate(
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+              child: child ?? const SizedBox.shrink(),
+            ),
           );
 
           if (isOnline) return content;

@@ -1,0 +1,5 @@
+- In-flight wallet-funded purchases are made idempotent by persisting a `LvAttempt` with the `PendingPayment.clientReference` as the backend idempotency key, then matching retries against recipient/amount/serviceType before deciding whether to re-debit or only redeliver.
+- Failure handling distinguishes `outcomeUnknown` (timeout / offline / 5xx) from definite failures: unknown outcomes keep the persisted attempt so the next retry never double-charges the wallet, while definite failures clear the store.
+- UI components are small private widgets prefixed with `_` (e.g. `_LidaValueActionPill`, `_ChooserCard`, `_CompactHistoryRow`, `_DestinationTypeCard`) defined alongside their parent screen rather than in separate files.
+- Bottom-sheet interactions use `showModalBottomSheet` with `useRootNavigator: true`, `isScrollControlled: true`, and a transparent background so the sheet can fill the full height needed for long wizards.
+- Dark/light theming is applied inline per widget by checking `Theme.of(context).brightness == Brightness.Brightness.dark` and selecting between `AppColors.darkSurface`/`darkScaffold` and light equivalents.

@@ -1,0 +1,1 @@
+Flutter + Riverpod (`StateNotifierProvider`), `shared_preferences` for durable pending records, `flutter_secure_storage`-backed `SecretStore` for tokens/MoMo numbers, `url_launcher` for external checkout, `uuid` for client idempotency references, and `equatable` for value equality.

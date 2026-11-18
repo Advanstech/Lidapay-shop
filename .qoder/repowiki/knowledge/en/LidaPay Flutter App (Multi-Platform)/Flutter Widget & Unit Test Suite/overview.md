@@ -1,0 +1,1 @@
+Flutter test suite covering widget flows, feature providers, API model parsing, and service-layer logic for the Lidapay mobile app using flutter_test.

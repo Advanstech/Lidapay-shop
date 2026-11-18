@@ -3,11 +3,21 @@ import 'package:dio/dio.dart';
 /// Normalized failure the UI can reason about. Created from Dio errors in
 /// [ApiClient]; mock repositories throw these directly.
 class ApiException implements Exception {
-  const ApiException(this.message, {this.code, this.statusCode});
+  const ApiException(
+    this.message, {
+    this.code,
+    this.statusCode,
+    this.outcomeUnknown = false,
+  });
 
   final String message;
   final String? code;
   final int? statusCode;
+
+  /// True when the request never produced a server response — a timeout, a
+  /// dropped connection or a dead link. The server may still have applied the
+  /// write, so a non-idempotent operation must never be blindly retried.
+  final bool outcomeUnknown;
 
   factory ApiException.fromDio(DioException e) {
     final data = e.response?.data;
@@ -23,6 +33,7 @@ class ApiException implements Exception {
       _friendly(message, e.response?.statusCode) ?? _fallbackFor(e.type),
       code: code,
       statusCode: e.response?.statusCode,
+      outcomeUnknown: e.response == null,
     );
   }
 

@@ -1,0 +1,1 @@
+Every widget test calls `SharedPreferences.setMockInitialValues({...})` before `pumpMockApp` to seed prefs and avoid hitting the live API; some long-running mock repositories require explicit `pumpAndSettle(const Duration(seconds: 1))` to simulate their latency.

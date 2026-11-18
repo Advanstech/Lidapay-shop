@@ -1,0 +1,5 @@
+- Data-layer access goes through the `DashboardRepository` abstraction so both live and mock implementations can be swapped at the provider level.
+- Domain models extend `Equatable` and override `props` to enable immutable, equality-driven rebuilds across Riverpod providers.
+- API payloads are parsed with tolerant key-list fallbacks (e.g. `Transaction.fromApiJson` tries multiple field names like `initiatedAt`/`createdAt`, `monetary.amount`/`amount`, nested `status.transaction/service/payment`) rather than assuming a fixed schema.
+- Network failures degrade gracefully per-section: `getWalletSummary` runs wallet/LidaValue/points in parallel and treats non-401 errors as zero values instead of bubbling exceptions.
+- Long-running background polling uses `StreamProvider.autoDispose` with an explicit backoff loop (starting at 4s, doubling up to 60s when no response succeeds) and writes settled results into dedicated `StateProvider`s for cross-feature consumption.

@@ -225,10 +225,28 @@ class HistoryScreen extends ConsumerWidget {
                     sliver: SliverList(
                       delegate: SliverChildBuilderDelegate((context, index) {
                         if (index == grouped.length) {
-                          if (state.hasMore) {
+                          final failed = state.loadMoreError != null;
+                          if (state.hasMore && !failed) {
                             WidgetsBinding.instance.addPostFrameCallback((_) {
                               ref.read(historyProvider.notifier).loadMore();
                             });
+                          }
+                          if (failed) {
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 20),
+                              child: Center(
+                                child: TextButton.icon(
+                                  onPressed: () => ref
+                                      .read(historyProvider.notifier)
+                                      .loadMore(),
+                                  icon: const Icon(
+                                    Icons.refresh_rounded,
+                                    size: 18,
+                                  ),
+                                  label: const Text('Couldn’t load more — retry'),
+                                ),
+                              ),
+                            );
                           }
                           return const Padding(
                             padding: EdgeInsets.symmetric(vertical: 24),

@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: lib_features/notifications
+title: Notifications Center & Delivery Pipeline
+scope:
+    - lib/features/notifications/
+source_files: []
+depends_on: []
+related_to: []

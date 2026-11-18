@@ -1,0 +1,4 @@
+- Feature modules follow a fixed directory layout of `data/`, `screens/`, `widgets/`, and a sibling `providers.dart` file.
+- Repository access is exposed through a Riverpod provider that returns either a mock or remote implementation, enabling one-line backend swapping.
+- Cross-feature state (session, pending top-ups, recently settled events) is shared exclusively via Riverpod `StateProvider`/`StateNotifierProvider` rather than globals.
+- Remote repositories depend on `ApiException` from `core/network/` for error propagation instead of throwing raw HTTP errors.

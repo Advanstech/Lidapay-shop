@@ -1,0 +1,1 @@
+Flutter + Riverpod (`StateNotifierProvider`, `FutureProvider.autoDispose.family`, `StreamProvider.autoDispose.family`); equatable for model equality; GoRouter for navigation to `AppRoutes.recipientDecision`.

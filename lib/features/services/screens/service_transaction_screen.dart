@@ -1444,7 +1444,11 @@ class _EnhancedInternetDataWizardState
       _resetNetworkForCountry();
     });
     ref.read(paymentSessionProvider.notifier).reset();
-    ref.invalidate(lidaValueTopupProvider);
+    // Never dispose the wallet-debit session while it is mid-flight — that
+    // would abandon a debit whose outcome the customer still has to see.
+    if (!ref.read(lidaValueTopupProvider.notifier).isRunning) {
+      ref.invalidate(lidaValueTopupProvider);
+    }
   }
 
   @override
@@ -1493,7 +1497,11 @@ class _EnhancedInternetDataWizardState
       }
     });
 
-    if (_receipt case final receipt?) {
+    // A purchase that was finished while this screen was away (the wallet
+    // was debited but the delivery was pending) is adopted here.
+    final lvState = ref.watch(lidaValueTopupProvider);
+    final receipt = _receipt ?? lvState.receipt;
+    if (receipt != null) {
       // A parked recipient decision is not a delivery — hand off to the
       // waiting screen which polls the top-up status for the real outcome.
       if (receipt.pendingTopup case final pending?) {

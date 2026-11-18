@@ -1,0 +1,2 @@
+- Legal/policy pages share styling by importing the single `legal.css` stylesheet rather than duplicating rules per page.
+- PWA icons are provided in both standard and maskable variants at 192px and 512px resolutions, referenced together in `manifest.json`.

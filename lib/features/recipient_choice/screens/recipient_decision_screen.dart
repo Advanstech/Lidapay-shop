@@ -61,10 +61,17 @@ class _RecipientDecisionScreenState
         .read(recipientDecisionProvider(widget.decisionId))
         .valueOrNull;
     if (!mounted) return;
+    final expiresAt = decision?.expiresAt;
+    final remaining = expiresAt?.difference(DateTime.now()) ?? Duration.zero;
+    // A window that has closed (or a decision already sent) is static — stop
+    // the 1s clock instead of ticking for the rest of the visit.
+    if ((expiresAt != null && remaining <= Duration.zero) ||
+        _submitted != null) {
+      _ticker?.cancel();
+      _ticker = null;
+    }
     setState(() {
-      _remaining =
-          decision?.expiresAt?.difference(DateTime.now()) ?? Duration.zero;
-      if (_remaining.isNegative) _remaining = Duration.zero;
+      _remaining = remaining.isNegative ? Duration.zero : remaining;
     });
   }
 

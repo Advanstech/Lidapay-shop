@@ -1,0 +1,1 @@
+Flutter + Riverpod (`flutter_riverpod`) for state; `equatable` for immutable model equality; `shared_preferences` for catalogue caching under the `svc_catalogue_v1:` key; GoRouter for navigation into the feature's routes.

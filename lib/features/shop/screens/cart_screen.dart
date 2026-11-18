@@ -256,7 +256,6 @@ class _CartScreenState extends ConsumerState<CartScreen>
                         ),
                       Expanded(
                         child: ListView.separated(
-                          physics: const BouncingScrollPhysics(),
                           padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
                           itemCount: cartData.items.length,
                           separatorBuilder: (_, _) =>
@@ -374,9 +373,13 @@ class _CartHeroHeader extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: EdgeInsets.fromLTRB(20, topInset + 12, 20, 18),
-      decoration: const BoxDecoration(
-        gradient: AppColors.heroGradient,
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(28)),
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        border: Border(
+          bottom: BorderSide(
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
+        ),
       ),
       child: Row(
         children: [
@@ -392,13 +395,17 @@ class _CartHeroHeader extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    const Text(
-                      'My Cart',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 21,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.3,
+                    Flexible(
+                      child: Text(
+                        'My Cart',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface,
+                          fontSize: 21,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.3,
+                        ),
                       ),
                     ),
                     if (itemCount > 0) ...[
@@ -426,9 +433,11 @@ class _CartHeroHeader extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Review items, delivery address & pay',
+                  'Review your items before checkout',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.78),
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                     fontSize: 12.5,
                     fontWeight: FontWeight.w500,
                   ),
@@ -468,20 +477,25 @@ class _HeaderIconBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Tooltip(
       message: tooltip,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          width: 42,
-          height: 42,
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+      child: Material(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: scheme.outlineVariant),
+            ),
+            alignment: Alignment.center,
+            child: Icon(icon, color: scheme.onSurface, size: 20),
           ),
-          alignment: Alignment.center,
-          child: Icon(icon, color: Colors.white, size: 20),
         ),
       ),
     );
@@ -534,18 +548,23 @@ class _CartLine extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    InkWell(
-                      onTap: updating
-                          ? null
-                          : () =>
-                                ref.read(cartProvider.notifier).remove(product),
-                      borderRadius: BorderRadius.circular(8),
-                      child: Padding(
-                        padding: const EdgeInsets.all(4),
-                        child: Icon(
-                          Icons.delete_outline_rounded,
-                          size: 20,
-                          color: scheme.onSurfaceVariant,
+                    Tooltip(
+                      message: 'Remove ${product.name}',
+                      child: InkWell(
+                        onTap: updating
+                            ? null
+                            : () => ref
+                                  .read(cartProvider.notifier)
+                                  .remove(product),
+                        borderRadius: BorderRadius.circular(12),
+                        child: SizedBox(
+                          width: 44,
+                          height: 44,
+                          child: Icon(
+                            Icons.delete_outline_rounded,
+                            size: 20,
+                            color: scheme.onSurfaceVariant,
+                          ),
                         ),
                       ),
                     ),
@@ -570,16 +589,23 @@ class _CartLine extends ConsumerWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          InkWell(
-                            onTap: updating
-                                ? null
-                                : () => ref
-                                      .read(cartProvider.notifier)
-                                      .setQuantity(product, item.quantity - 1),
-                            borderRadius: BorderRadius.circular(10),
-                            child: const Padding(
-                              padding: EdgeInsets.all(6),
-                              child: Icon(Icons.remove_rounded, size: 16),
+                          Tooltip(
+                            message: 'Decrease quantity',
+                            child: InkWell(
+                              onTap: updating
+                                  ? null
+                                  : () => ref
+                                        .read(cartProvider.notifier)
+                                        .setQuantity(
+                                          product,
+                                          item.quantity - 1,
+                                        ),
+                              borderRadius: BorderRadius.circular(10),
+                              child: const SizedBox(
+                                width: 40,
+                                height: 40,
+                                child: Icon(Icons.remove_rounded, size: 18),
+                              ),
                             ),
                           ),
                           Padding(
@@ -592,16 +618,23 @@ class _CartLine extends ConsumerWidget {
                               ),
                             ),
                           ),
-                          InkWell(
-                            onTap: updating || item.quantity >= product.stock
-                                ? null
-                                : () => ref
-                                      .read(cartProvider.notifier)
-                                      .setQuantity(product, item.quantity + 1),
-                            borderRadius: BorderRadius.circular(10),
-                            child: const Padding(
-                              padding: EdgeInsets.all(6),
-                              child: Icon(Icons.add_rounded, size: 16),
+                          Tooltip(
+                            message: 'Increase quantity',
+                            child: InkWell(
+                              onTap: updating || item.quantity >= product.stock
+                                  ? null
+                                  : () => ref
+                                        .read(cartProvider.notifier)
+                                        .setQuantity(
+                                          product,
+                                          item.quantity + 1,
+                                        ),
+                              borderRadius: BorderRadius.circular(10),
+                              child: const SizedBox(
+                                width: 40,
+                                height: 40,
+                                child: Icon(Icons.add_rounded, size: 18),
+                              ),
                             ),
                           ),
                         ],

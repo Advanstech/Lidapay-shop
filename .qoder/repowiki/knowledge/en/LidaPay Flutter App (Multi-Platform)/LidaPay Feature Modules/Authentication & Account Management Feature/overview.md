@@ -1,0 +1,1 @@
+Flutter feature providing user registration, login (password + OTP), biometric sign-in, profile management, phone/email verification, and password reset/change flows backed by a remote API.

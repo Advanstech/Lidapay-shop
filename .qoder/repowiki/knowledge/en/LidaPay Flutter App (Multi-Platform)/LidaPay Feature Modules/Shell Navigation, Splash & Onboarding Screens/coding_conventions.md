@@ -1,0 +1,4 @@
+- Screen entry points are placed one level deep under `screens/` inside their feature folder (e.g. `features/splash/screens/splash_screen.dart`, `features/onboarding/screens/onboarding_screen.dart`).
+- Routing out of screens goes through `context.go(AppRoutes.<route>)` rather than direct route strings, keeping destinations centralized in `AppRoutes`.
+- Animated UI elements use `AnimatedBuilder` driven by a shared `AnimationController` with `Interval` curves to stagger sub-animations (scale, opacity, progress bar) instead of separate controllers per element.
+- Tab-like collections are declared as static const tuples/lists at class scope (e.g. `_tabs` in `MainDock`, `_pages` in `OnboardingScreen`) and iterated with `for` loops or `PageView.builder` to keep data and rendering in one place.

@@ -1,0 +1,9 @@
+schema_version: 1
+module_path: tooling
+title: Dev & Ops Tooling
+scope:
+    - tool/
+    - tool_static_server.mjs
+source_files: []
+depends_on: []
+related_to: []

@@ -70,8 +70,8 @@ class _ConvertScreenState extends State<ConvertScreen> {
       final isEligible = await ref
           .read(servicesRepositoryProvider)
           .checkLidaValueEligibility();
+      if (!mounted) return;
       if (!isEligible) {
-        if (!mounted) return;
         setState(() {
           _busy = false;
           _error = 'Your account is not currently eligible for conversion. Please contact support.';
@@ -96,6 +96,17 @@ class _ConvertScreenState extends State<ConvertScreen> {
         _busy = false;
         _error = failure.message;
       });
+    } catch (_) {
+      // A malformed response must never leave the convert button locked.
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error =
+            'The conversion could not be completed. Check your Lida Value '
+            'balance and try again.';
+      });
+    } finally {
+      if (mounted && _busy) setState(() => _busy = false);
     }
   }
 

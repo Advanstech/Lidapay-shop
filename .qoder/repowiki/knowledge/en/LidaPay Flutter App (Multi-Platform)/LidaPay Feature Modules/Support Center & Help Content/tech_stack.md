@@ -1,0 +1,1 @@
+Flutter Material 3 UI built on `CustomScrollView`/`Sliver*` for the sticky-header scroll experience, `go_router` for navigation, and `url_launcher` to open `mailto:`/`tel:` URIs.

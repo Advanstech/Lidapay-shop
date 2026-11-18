@@ -1,0 +1,1 @@
+Flutter testing via `flutter_test`; state management tested through `flutter_riverpod`'s `ProviderScope` overrides; shared persistence mocked via `shared_preferences`' `setMockInitialValues`.

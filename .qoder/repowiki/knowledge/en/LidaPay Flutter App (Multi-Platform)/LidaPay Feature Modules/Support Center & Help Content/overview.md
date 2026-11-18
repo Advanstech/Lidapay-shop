@@ -1,0 +1,1 @@
+Flutter feature providing the Support Center hub with searchable FAQs, per-category detail pages, and contact channels (email/phone) for Lidapay users.

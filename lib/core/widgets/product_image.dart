@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 /// Product artwork from either the bundled catalog or a live API URL. Remote
@@ -37,6 +38,11 @@ class ProductImage extends StatelessWidget {
     return trimmed;
   }
 
+  /// Catalog art is always served over TLS — a plaintext URL would be
+  /// blocked on Android and leaks the customer's browsing.
+  static String _secureUrl(String url) =>
+      url.startsWith('http://') ? 'https://${url.substring(7)}' : url;
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -44,25 +50,19 @@ class ProductImage extends StatelessWidget {
     final isRemote =
         clean.startsWith('http://') || clean.startsWith('https://');
     final placeholder = _placeholder(scheme);
-    Widget loadingBuilder(
-      BuildContext context,
-      Widget child,
-      ImageChunkEvent? progress,
-    ) {
-      if (progress == null) return child;
-      return placeholder;
-    }
 
     final image = isRemote
-        ? Image.network(
-            clean,
+        ? CachedNetworkImage(
+            // The disk cache keeps the catalog readable on a slow or lost
+            // connection — the storefront opens instantly offline.
+            imageUrl: _secureUrl(clean),
             width: width,
             height: height,
             fit: fit,
-            cacheWidth: memCacheWidth,
-            webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
-            loadingBuilder: loadingBuilder,
-            errorBuilder: (_, _, _) => placeholder,
+            memCacheWidth: memCacheWidth,
+            fadeInDuration: const Duration(milliseconds: 180),
+            placeholder: (_, _) => placeholder,
+            errorWidget: (_, _, _) => placeholder,
           )
         : Image.asset(
             clean,

@@ -1,0 +1,1 @@
+Runtime behavior is configured via `--dart-define` flags at build time: `API_BASE_URL` (backend base), `GOOGLE_MAPS_API_KEY` (maps tiles), `CHECKOUT_ALLOWED_HOSTS` (comma-separated gateway hosts). In `main()` the default `SharedPreferences` provider and `SecretStore` must be overridden with Keystore/Keychain-backed implementations; otherwise tests run with in-memory stores.

@@ -1,0 +1,5 @@
+- Domain models in `service_models.dart` extend `Equatable` and override `props` to list all fields used for equality comparison.
+- API payloads are parsed through tolerant helpers (`payloadPool`, `stringField`, `numberField`, `boolField`, `dateField`) from `core/network/api_payload.dart` rather than strict JSON decoding, because many endpoints have undocumented or variant response shapes.
+- Catalogue reads (countries, operators, bundles) go through `_catalogue` which persists successful responses to `SharedPreferences` and falls back to the cached copy on `ApiException`, keeping the wizard usable when the provider is down.
+- Each repository method is exposed as a named `FutureProvider` (or `FutureProvider.family` for keyed lookups) in `providers.dart`, with the provider body simply delegating to `ref.watch(servicesRepositoryProvider)`.
+- The live repository is selected at runtime via `servicesRepositoryProvider`, which watches `authSessionProvider` and injects the current user's id/name/phone into `RemoteServicesRepository`.

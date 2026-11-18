@@ -1,0 +1,1 @@
+Node.js (both ESM via `import.meta.url` and CommonJS), Python 3 with Pillow + NumPy for image processing, Puppeteer Core for live checks; courier scripts use `jsonwebtoken` and `mongodb` driver.

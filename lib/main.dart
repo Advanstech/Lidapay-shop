@@ -12,6 +12,7 @@ import 'core/network/token_store.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/providers.dart';
+import 'features/payments/providers.dart';
 
 void main() {
   runZonedGuarded<Future<void>>(() async {
@@ -19,6 +20,12 @@ void main() {
 
     // Configure Edge-to-Edge display on Android 10+ and Samsung One UI
     await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+
+    // Release builds must not write diagnostics (URLs, identifiers) to the
+    // device log; release crash reporting is the field channel.
+    if (!kDebugMode) {
+      debugPrint = (String? message, {int? wrapWidth}) {};
+    }
 
     // Global Framework Error Handler (prevents crashes from layout bugs)
     FlutterError.onError = (FlutterErrorDetails details) {
@@ -94,7 +101,8 @@ void main() {
     final identity = await DeviceIdentityLoader.load(prefs);
 
     // Initialize Keystore/Keychain secure secret store and migrate any legacy prefs
-    final tokenStore = TokenStore(prefs, secrets: SecureSecretStore());
+    final secrets = SecureSecretStore();
+    final tokenStore = TokenStore(prefs, secrets: secrets);
     try {
       await tokenStore.load();
     } catch (e) {
@@ -105,10 +113,22 @@ void main() {
       overrides: [
         sharedPrefsProvider.overrideWithValue(prefs),
         tokenStoreProvider.overrideWithValue(tokenStore),
+        secretStoreProvider.overrideWithValue(secrets),
         deviceIdentityProvider.overrideWithValue(identity),
       ],
     );
     appContainer = container;
+
+    // Bring the encrypted fields of any in-flight purchase into memory before
+    // the payment session can be constructed.
+    try {
+      await container
+          .read(pendingPaymentStoreProvider)
+          .hydrate()
+          .timeout(const Duration(seconds: 2));
+    } catch (e) {
+      debugPrint('Pending payment hydrate warning: $e');
+    }
 
     // Fast-boot with bounded timeout: prevent splash freeze if network/keystore is slow
     try {
