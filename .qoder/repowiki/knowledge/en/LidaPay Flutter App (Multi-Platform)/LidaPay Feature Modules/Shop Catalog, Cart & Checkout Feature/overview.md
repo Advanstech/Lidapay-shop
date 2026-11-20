@@ -1,1 +1,0 @@
-Flutter feature module providing product browsing, cart management, checkout, order history and delivery tracking for the LidaPay shop.

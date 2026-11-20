@@ -1,0 +1,1 @@
+Machine- and human-readable API surface documentation (OpenAPI spec, endpoint index) plus cross-team handoff guides for mobile, courier, Google Maps, and notification integrations.

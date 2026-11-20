@@ -1,0 +1,1 @@
+Flutter with `flutter_riverpod` for state management, `equatable` for `OrdersListState` value equality, and `shared_preferences` for device-persisted loved-product sets keyed by user id.

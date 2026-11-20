@@ -1,0 +1,6 @@
+Clean-layered Riverpod feature split into three sub-folders plus a single entry point:
+- `data/shop_repository.dart` declares the abstract `ShopRepository` interface (one method per `/api/v1/shop/*` endpoint); `remote_shop_repository.dart` implements it via `ApiClient` + `ApiEndpoints`, and `mock_shop_repository.dart` provides an in-memory catalog.
+- `providers.dart` is the sole DI boundary: `shopRepositoryProvider` binds to `RemoteShopRepository` (swappable to mock), and exposes `FutureProvider`s for categories/products/featured/orders, `StateNotifierProvider`s for `CartController` (cart state) and `LovedProductsNotifier` (device-persisted favorites via `SharedPreferences`), plus a paginated `OrdersController` and an auto-disposing `StreamProvider.autoDispose.family` polling `getOrderTracking` every 8s until terminal status.
+- `screens/` holds four top-level screens (`shop_screen`, `cart_screen`, `orders_screen`, `checkout_success_screen`) that consume only Riverpod providers — they never call the repository directly.
+- `widgets/` contains reusable UI pieces (product card/detail sheet, shipping address picker, delivery pin screen, driver location map) with no data-layer dependencies.
+Dependency direction is strictly one-way: screens → providers → repository → API; the mock/live boundary is a single provider swap at `shopRepositoryProvider`.

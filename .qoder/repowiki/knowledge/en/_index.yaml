@@ -3,11 +3,11 @@ schema_version: 1
 locale: en-US
 branch: main
 nodes_managed: true
-exported_at: "2026-11-18T15:46:24Z"
+exported_at: "2026-11-18T17:06:55Z"
 modules:
     "":
-        dir_name: LidaPay Flutter App (Multi-Platform)
-        title: LidaPay Flutter App (Multi-Platform)
+        dir_name: LidaPay Flutter Application Monorepo Root
+        title: LidaPay Flutter Application Monorepo Root
         scope:
             - README.md
             - pubspec.yaml
@@ -28,8 +28,8 @@ modules:
         depends_on: []
         related_to: []
     android_native:
-        dir_name: Android Native App Shell
-        title: Android Native App Shell
+        dir_name: Lidapay Android Application Shell
+        title: Lidapay Android Application Shell
         scope:
             - android/
         source_files: []
@@ -37,8 +37,8 @@ modules:
         depends_on: []
         related_to: []
     api_docs:
-        dir_name: API Reference Documentation & OpenAPI Spec
-        title: API Reference Documentation & OpenAPI Spec
+        dir_name: API Documentation & Partner Handoff Guides
+        title: API Documentation & Partner Handoff Guides
         scope:
             - api/
             - docs/
@@ -56,19 +56,17 @@ modules:
         depends_on: []
         related_to: []
     lib_core:
-        dir_name: Application Core & Cross-Cutting Infrastructure
-        title: Application Core & Cross-Cutting Infrastructure
+        dir_name: LidaPay Cross-Cutting Foundation Layer
+        title: LidaPay Cross-Cutting Foundation Layer
         scope:
             - lib/core/
         source_files: []
         children: []
         depends_on: []
-        related_to:
-            - path: lib_features/payments
-            - path: lib_features/recipient_choice
+        related_to: []
     lib_features:
-        dir_name: LidaPay Feature Modules
-        title: LidaPay Feature Modules
+        dir_name: LidaPay Flutter Feature Layer
+        title: LidaPay Flutter Feature Layer
         scope:
             - lib/features/
         source_files: []
@@ -88,8 +86,8 @@ modules:
         depends_on: []
         related_to: []
     lib_features/auth:
-        dir_name: Authentication & Account Management Feature
-        title: Authentication & Account Management Feature
+        dir_name: Authentication & User Session Feature
+        title: Authentication & User Session Feature
         scope:
             - lib/features/auth/
         source_files: []
@@ -106,6 +104,7 @@ modules:
         depends_on: []
         related_to:
             - path: lib_features/history
+            - path: lib_features/recipient_choice
     lib_features/history:
         dir_name: Transaction History & Analytics Feature
         title: Transaction History & Analytics Feature
@@ -117,8 +116,8 @@ modules:
         related_to:
             - path: lib_features/dashboard
     lib_features/legal:
-        dir_name: Legal & Policy Documents Hub
-        title: Legal & Policy Documents Hub
+        dir_name: Legal & Policy Hub
+        title: Legal & Policy Hub
         scope:
             - lib/features/legal/
         source_files: []
@@ -126,8 +125,8 @@ modules:
         depends_on: []
         related_to: []
     lib_features/lida_value:
-        dir_name: Lida Value Wallet Feature
-        title: Lida Value Wallet Feature
+        dir_name: Lida Value Wallet Top-Up Feature
+        title: Lida Value Wallet Top-Up Feature
         scope:
             - lib/features/lida_value/
         source_files: []
@@ -145,31 +144,29 @@ modules:
         depends_on: []
         related_to: []
     lib_features/payments:
-        dir_name: Payment Orchestration & Checkout Flow
-        title: Payment Orchestration & Checkout Flow
+        dir_name: Advansis Pay & GTPay Payment Orchestration
+        title: Advansis Pay & GTPay Payment Orchestration
         scope:
             - lib/features/payments/
         source_files: []
         children: []
         depends_on: []
         related_to:
-            - path: lib_core
             - path: lib_features/lida_value
             - path: lib_features/services
-            - path: lib_features/shop
     lib_features/recipient_choice:
-        dir_name: Recipient Choice & Parked Top-up Flow
-        title: Recipient Choice & Parked Top-up Flow
+        dir_name: Recipient Choice for Parked Top-Ups
+        title: Recipient Choice for Parked Top-Ups
         scope:
             - lib/features/recipient_choice/
         source_files: []
         children: []
         depends_on: []
         related_to:
-            - path: lib_core
+            - path: lib_features/dashboard
     lib_features/services:
-        dir_name: Services Feature (Airtime, Data, Lida Value & Rewards)
-        title: Services Feature (Airtime, Data, Lida Value & Rewards)
+        dir_name: Services Feature (Airtime, Data, Lida Value & Points)
+        title: Services Feature (Airtime, Data, Lida Value & Points)
         scope:
             - lib/features/services/
         source_files: []
@@ -189,18 +186,17 @@ modules:
         depends_on: []
         related_to: []
     lib_features/shop:
-        dir_name: Shop Catalog, Cart & Checkout Feature
-        title: Shop Catalog, Cart & Checkout Feature
+        dir_name: Shop Feature (Catalog, Cart & Checkout)
+        title: Shop Feature (Catalog, Cart & Checkout)
         scope:
             - lib/features/shop/
         source_files: []
         children: []
         depends_on: []
-        related_to:
-            - path: lib_features/payments
+        related_to: []
     lib_features/support:
-        dir_name: Support Center & Help Content
-        title: Support Center & Help Content
+        dir_name: Support Center Feature
+        title: Support Center Feature
         scope:
             - lib/features/support/
         source_files: []
@@ -208,8 +204,8 @@ modules:
         depends_on: []
         related_to: []
     tests:
-        dir_name: Flutter Widget & Unit Test Suite
-        title: Flutter Widget & Unit Test Suite
+        dir_name: LidaPay Flutter Widget & Unit Test Suite
+        title: LidaPay Flutter Widget & Unit Test Suite
         scope:
             - test/
         source_files: []

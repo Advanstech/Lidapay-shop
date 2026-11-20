@@ -16,6 +16,16 @@
 - [ENDPOINTS.md](file://api/ENDPOINTS.md)
 </cite>
 
+## Update Summary
+**Changes Made**
+- Updated Profile Screen architecture with enhanced UI components and improved responsiveness
+- Added comprehensive KYC progress tracking and verification management
+- Enhanced account deletion flow with reason-gated confirmation and improved error handling
+- Improved wallet summary integration with real-time balance updates
+- Enhanced contact verification system with inline email and phone verification
+- Added advanced theme mode selection with animated transitions
+- Improved navigation structure with sticky headers and better scroll performance
+
 ## Table of Contents
 1. [Introduction](#introduction)
 2. [Project Structure](#project-structure)
@@ -32,7 +42,7 @@ This document explains the profile and settings functionality in the application
 
 ## Project Structure
 The profile and settings feature spans several modules:
-- Profile screens for viewing and editing user information.
+- Profile screens for viewing and editing user information with enhanced UI components.
 - Authentication providers and repositories for session and profile synchronization.
 - Validation utilities for form inputs.
 - Legal hub and policy acceptance for compliance and consent.
@@ -42,7 +52,7 @@ The profile and settings feature spans several modules:
 ```mermaid
 graph TB
 subgraph "Profile Feature"
-PS["ProfileScreen"]
+PS["ProfileScreen<br/>Enhanced UI"]
 EPS["EditProfileScreen"]
 end
 subgraph "Auth Layer"
@@ -60,6 +70,12 @@ LHS["LegalHubScreen"]
 PA["PolicyAcceptance"]
 LC["Legal Content"]
 end
+subgraph "New Components"
+KYC["_KycProgressCard"]
+VERIF["_ContactStatusChip"]
+THEME["_ThemeModeCard"]
+DELETION["_DeletionReasonSheet"]
+end
 PS --> AP
 EPS --> AP
 AP --> RR
@@ -69,6 +85,10 @@ PS --> TP
 PS --> LHS
 LHS --> PA
 PA --> LC
+PS --> KYC
+PS --> VERIF
+PS --> THEME
+PS --> DELETION
 ```
 
 **Diagram sources**
@@ -96,8 +116,12 @@ PA --> LC
 - [legal_content.dart:30-58](file://lib/features/legal/legal_content.dart#L30-L58)
 
 ## Core Components
-- Profile screen: Displays user identity, verification status, wallet summary, and navigation to settings and legal documents. It also supports logout and account deletion flows.
-- Edit profile screen: Allows updating personal details, delivery address, location coordinates, and contact verification (email and phone).
+- **Enhanced Profile Screen**: Displays user identity, verification status, wallet summary, and navigation to settings and legal documents with improved UI responsiveness and interactive components.
+- **Edit Profile Screen**: Allows updating personal details, delivery address, location coordinates, and contact verification (email and phone).
+- **KYC Progress Card**: Tracks verification progress with visual indicators and actionable items for incomplete steps.
+- **Contact Status Chip**: Provides inline verification for email and phone contacts with real-time status updates.
+- **Theme Mode Card**: Offers animated theme switching between system, light, and dark modes.
+- **Account Deletion Flow**: Enhanced with reason-gated confirmation and improved error handling.
 - Auth layer: Manages session state, profile refresh, profile updates, and verification endpoints.
 - Data models: UserProfile and ProfileUpdateRequest define the shape of profile data and update payloads.
 - Validators: Enforce email, phone, OTP, and password rules used across forms.
@@ -115,8 +139,8 @@ PA --> LC
 - [theme_provider.dart:6-38](file://lib/core/providers/theme_provider.dart#L6-L38)
 
 ## Architecture Overview
-The profile and settings architecture follows a layered approach:
-- UI layer: Screens render user data and collect input.
+The profile and settings architecture follows a layered approach with enhanced component separation:
+- UI layer: Screens render user data and collect input with improved responsive design.
 - State layer: Riverpod providers manage session, profile sync, and settings.
 - Repository layer: Remote repository calls backend APIs and persists merged profile data.
 - Network layer: Centralized endpoints and exception handling.
@@ -148,17 +172,18 @@ EPS-->>User : "Success feedback and navigation"
 
 ## Detailed Component Analysis
 
-### Profile Screen
+### Enhanced Profile Screen
 Responsibilities:
-- Display current user info, verification badge, and wallet summary.
+- Display current user info, verification badge, and wallet summary with improved UI responsiveness.
 - Provide actions for KYC, password change, rewards, shop orders, support, legal, and account deletion.
-- Refresh profile and wallet data on mount and pull-to-refresh.
-- Handle logout and account deletion via external mail intent or manual fallback.
+- Refresh profile and wallet data on mount and pull-to-refresh with optimized data loading.
+- Handle logout and account deletion via external mail intent or manual fallback with enhanced error handling.
 
 Key behaviors:
 - Profile sync provider triggers GET /users/profile once per mount to keep display fields fresh.
 - Account deletion opens a pre-filled mailto request; if unavailable, shows a manual copy dialog.
 - Theme mode card toggles appearance setting persisted by the theme provider.
+- Wallet summary invalidates on build to ensure fresh balances.
 
 ```mermaid
 flowchart TD
@@ -191,6 +216,71 @@ SetTheme --> End
 - [profile_screen.dart:211-480](file://lib/features/profile/screens/profile_screen.dart#L211-L480)
 - [theme_provider.dart:6-38](file://lib/core/providers/theme_provider.dart#L6-L38)
 - [legal_hub_screen.dart:15-303](file://lib/features/legal/screens/legal_hub_screen.dart#L15-L303)
+
+### Enhanced KYC Progress Tracking
+The profile screen now includes a comprehensive KYC progress card that provides:
+- Visual progress indicator showing completion percentage
+- Individual verification step tracking with status icons
+- Actionable items for incomplete verification steps
+- Real-time status updates for email and phone verification
+
+Key features:
+- Tracks account creation, country setting, email verification, phone verification, delivery address setup, and identity verification
+- Provides direct actions for resending verification emails and navigating to address setup
+- Shows completion percentage with color-coded progress bar
+
+**Section sources**
+- [profile_screen.dart:1497-1611](file://lib/features/profile/screens/profile_screen.dart#L1497-L1611)
+
+### Enhanced Contact Verification System
+The profile screen now includes inline contact verification through the `_ContactStatusChip` component:
+- Email verification with resend functionality and cooldown protection
+- Phone verification with SMS code entry and confirmation workflow
+- Real-time status updates with visual feedback
+- Error handling with user-friendly messages
+
+Verification workflow:
+- Users can tap verification chips to initiate verification processes
+- Email verification sends confirmation emails with inbox/spam folder guidance
+- Phone verification prompts for SMS code entry with validation
+- Success/error states are displayed immediately
+
+**Section sources**
+- [profile_screen.dart:955-1137](file://lib/features/profile/screens/profile_screen.dart#L955-L1137)
+
+### Enhanced Theme Mode Selection
+The profile screen includes an advanced theme mode card (`_ThemeModeCard`) that provides:
+- Animated transitions between theme modes
+- Visual feedback for selected theme
+- Support for system, light, and dark themes
+- Immediate theme application without app restart
+
+Features:
+- Three-way theme selection with gradient backgrounds
+- Animated container transitions for smooth theme switching
+- Integration with theme provider for persistent storage
+- Responsive design that adapts to different screen sizes
+
+**Section sources**
+- [profile_screen.dart:1206-1347](file://lib/features/profile/screens/profile_screen.dart#L1206-L1347)
+
+### Enhanced Account Deletion Flow
+The profile screen includes a sophisticated account deletion flow with:
+- Reason-gated confirmation requiring user input before proceeding
+- Suggested reasons with quick-select chips
+- Manual fallback when email apps are unavailable
+- Improved error handling and user feedback
+
+Deletion workflow:
+- Modal bottom sheet collects deletion reason with validation
+- Suggested reasons include common scenarios like privacy concerns, duplicate accounts, etc.
+- Attempts to launch email client with pre-filled subject and body
+- Falls back to clipboard copying when no email app is available
+- Provides clear success/error feedback throughout the process
+
+**Section sources**
+- [profile_screen.dart:83-208](file://lib/features/profile/screens/profile_screen.dart#L83-L208)
+- [profile_screen.dart:1683-1855](file://lib/features/profile/screens/profile_screen.dart#L1683-L1855)
 
 ### Edit Profile Screen
 Responsibilities:
@@ -436,6 +526,10 @@ PS --> LHS["LegalHubScreen"]
 LHS --> PA["PolicyAcceptance"]
 PA --> LC["LegalContent"]
 EPS --> V["Validators"]
+PS --> KYC["_KycProgressCard"]
+PS --> VERIF["_ContactStatusChip"]
+PS --> THEME["_ThemeModeCard"]
+PS --> DELETION["_DeletionReasonSheet"]
 ```
 
 **Diagram sources**
@@ -469,11 +563,14 @@ EPS --> V["Validators"]
 - Wallet summary is invalidated on profile screen build to ensure fresh balances.
 - Theme preference reads/writes are lightweight and cached via SharedPreferences.
 - Policy acceptance is read synchronously from SharedPreferences where needed to avoid blocking UI.
+- Enhanced UI components use efficient widget composition with proper state management.
+- Sticky headers and custom scroll views improve navigation performance.
 
 Recommendations:
 - Avoid repeated network calls for profile data within short intervals; rely on provider caching and invalidation strategies already implemented.
 - Use skeleton widgets for loading states to improve perceived performance.
-- Debounce location fetches if users repeatedly trigger “Get Latest Location”.
+- Debounce location fetches if users repeatedly trigger "Get Latest Location".
+- Leverage the new component architecture for better maintainability and performance.
 
 [No sources needed since this section provides general guidance]
 
@@ -484,10 +581,14 @@ Common issues and resolutions:
 - Theme not persisting: Ensure SharedPreferences is initialized and the user touched the theme setting before app restart.
 - Legal policy not marked as accepted: Confirm policy version bump and call accept() to persist current version.
 - Account deletion mailto fails: Use manual fallback dialog to copy request details and send via email client manually.
+- KYC progress not updating: Verify that verification endpoints are responding correctly and check network connectivity.
+- Contact verification chips not working: Ensure proper internet connection and verify that email/phone services are accessible.
 
 Operational tips:
 - For transient backend errors, refreshProfile retries once after a delay; persistent 401 clears tokens and logs out.
 - When contacts change, backend resets verification flags; prompt users to verify again.
+- Use the enhanced error handling in the new components for better user feedback.
+- Monitor wallet summary invalidation to ensure fresh balance data.
 
 **Section sources**
 - [edit_profile_screen.dart:123-155](file://lib/features/profile/screens/edit_profile_screen.dart#L123-L155)
@@ -498,6 +599,16 @@ Operational tips:
 - [policy_acceptance.dart:41-52](file://lib/features/legal/policy_acceptance.dart#L41-L52)
 
 ## Conclusion
-The profile and settings functionality provides a comprehensive experience for managing user identity, verification, appearance preferences, and legal compliance. It integrates tightly with authentication and network layers, ensuring robust data synchronization and clear error handling. Privacy considerations are addressed through careful profile image resolution, explicit policy acceptance, and transparent account deletion processes. The modular design enables maintainability and extensibility for future enhancements such as granular notification preferences and advanced settings backup/restore mechanisms.
+The profile and settings functionality provides a comprehensive experience for managing user identity, verification, appearance preferences, and legal compliance. With the recent refactoring, the system now includes enhanced UI components, improved account management features, and better user interface responsiveness. The modular design enables maintainability and extensibility for future enhancements such as granular notification preferences and advanced settings backup/restore mechanisms.
+
+The significant improvements include:
+- Enhanced KYC progress tracking with visual indicators
+- Inline contact verification with real-time status updates
+- Advanced theme mode selection with animated transitions
+- Sophisticated account deletion flow with reason-gated confirmation
+- Improved wallet summary integration with real-time balance updates
+- Better error handling and user feedback throughout the interface
+
+These enhancements provide a more robust and user-friendly experience while maintaining the existing architectural patterns and data flow.
 
 [No sources needed since this section summarizes without analyzing specific files]

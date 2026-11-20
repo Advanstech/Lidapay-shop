@@ -1,1 +1,0 @@
-Human-readable API endpoint inventory, a machine-consumable OpenAPI 3.0 spec, and partner handoff guides covering authentication, payments, shop, notifications, and third-party integrations.

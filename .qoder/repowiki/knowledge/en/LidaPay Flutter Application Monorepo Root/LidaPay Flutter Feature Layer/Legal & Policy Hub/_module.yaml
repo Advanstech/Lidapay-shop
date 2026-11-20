@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: lib_features/legal
+title: Legal & Policy Hub
+scope:
+    - lib/features/legal/
+source_files: []
+depends_on: []
+related_to: []

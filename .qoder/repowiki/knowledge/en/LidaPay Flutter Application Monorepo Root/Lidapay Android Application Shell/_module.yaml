@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: android_native
+title: Lidapay Android Application Shell
+scope:
+    - android/
+source_files: []
+depends_on: []
+related_to: []

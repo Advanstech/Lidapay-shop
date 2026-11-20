@@ -1,9 +1,0 @@
-schema_version: 1
-module_path: lib_features/shop
-title: Shop Catalog, Cart & Checkout Feature
-scope:
-    - lib/features/shop/
-source_files: []
-depends_on: []
-related_to:
-    - path: lib_features/payments

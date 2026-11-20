@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: lib_features/support
+title: Support Center Feature
+scope:
+    - lib/features/support/
+source_files: []
+depends_on: []
+related_to: []

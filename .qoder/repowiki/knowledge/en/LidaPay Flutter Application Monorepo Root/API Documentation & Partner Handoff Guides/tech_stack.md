@@ -1,0 +1,1 @@
+OpenAPI 3.0 (`openapi.json`) consumed by Swagger UI at `/api-doc`; endpoint map generated via extraction against a live server instance.

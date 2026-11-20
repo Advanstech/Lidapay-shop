@@ -8,10 +8,21 @@
 - [api_client.dart](file://lib/core/network/api_client.dart)
 - [api_endpoints.dart](file://lib/core/network/api_endpoints.dart)
 - [token_store.dart](file://lib/core/network/token_store.dart)
+- [pending_payment_store.dart](file://lib/features/payments/data/pending_payment_store.dart)
+- [pending_payment.dart](file://lib/features/payments/data/pending_payment.dart)
+- [providers.dart](file://lib/features/payments/providers.dart)
+- [main.dart](file://lib/main.dart)
 - [payment_models.dart](file://lib/features/payments/data/payment_models.dart)
 - [privacy-policy.html](file://web/privacy-policy.html)
 - [payments-refunds.html](file://web/payments-refunds.html)
 </cite>
+
+## Update Summary
+**Changes Made**
+- Added comprehensive documentation for SecretStore abstraction and encrypted storage of sensitive payment data
+- Updated pending payment store implementation details with encryption focus
+- Enhanced security architecture diagrams to include SecretStore integration
+- Added new sections covering encrypted storage patterns and migration strategies
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -44,19 +55,24 @@ B["Deep link handler<br/>lib/core/deep_links.dart"]
 C["API client<br/>lib/core/network/api_client.dart"]
 D["Token store<br/>lib/core/network/token_store.dart"]
 E["Payment models<br/>lib/features/payments/data/payment_models.dart"]
+F["Pending payment store<br/>lib/features/payments/data/pending_payment_store.dart"]
+G["Main app initialization<br/>lib/main.dart"]
 end
 subgraph "Backend"
-F["Auth refresh<br/>/api/v1/auth/refresh"]
-G["Advansis Pay endpoints<br/>/api/v1/advansispay/*"]
-H["GTPay endpoints<br/>/api/v1/gtpay/*"]
+H["Auth refresh<br/>/api/v1/auth/refresh"]
+I["Advansis Pay endpoints<br/>/api/v1/advansispay/*"]
+J["GTPay endpoints<br/>/api/v1/gtpay/*"]
 end
 A --> B
 A --> C
 C --> D
 C --> F
-C --> G
 C --> H
+C --> I
+C --> J
 B --> E
+G --> D
+G --> F
 ```
 
 **Diagram sources**
@@ -65,21 +81,26 @@ B --> E
 - [api_client.dart:13-24](file://lib/core/network/api_client.dart#L13-L24)
 - [api_endpoints.dart:6-108](file://lib/core/network/api_endpoints.dart#L6-L108)
 - [token_store.dart:71-74](file://lib/core/network/token_store.dart#L71-L74)
+- [pending_payment_store.dart:17-26](file://lib/features/payments/data/pending_payment_store.dart#L17-L26)
+- [main.dart:103-131](file://lib/main.dart#L103-L131)
 - [payment_models.dart:5-49](file://lib/features/payments/data/payment_models.dart#L5-L49)
 
 **Section sources**
 - [README.md:1-47](file://README.md#L1-L47)
 
 ## Core Components
-- Secure token storage: Tokens and profile data are persisted using an encrypted secret store backed by platform secure storage (Android Keystore or iOS Keychain). Legacy plaintext preferences are migrated and removed at startup.
-- Secure API communication: The HTTP client adds bearer tokens, request IDs, redacts sensitive fields in debug logs, and transparently refreshes access tokens on 401 responses.
-- Payment callbacks: Deep links from payment providers are recognized, validated, and routed to a payment callback screen without forwarding provider tokens into app state.
-- Payment models: Models parse provider payloads and normalize outcomes (success, failed, pending), including both Advansis Pay and GTPay flows.
+- **Secure token storage**: Tokens and profile data are persisted using an encrypted secret store backed by platform secure storage (Android Keystore or iOS Keychain). Legacy plaintext preferences are migrated and removed at startup.
+- **Encrypted payment data storage**: Sensitive payment fields like verification tokens and MoMo wallet numbers are stored separately in encrypted storage via SecretStore abstraction, while non-sensitive data remains in SharedPreferences.
+- **Secure API communication**: The HTTP client adds bearer tokens, request IDs, redacts sensitive fields in debug logs, and transparently refreshes access tokens on 401 responses.
+- **Payment callbacks**: Deep links from payment providers are recognized, validated, and routed to a payment callback screen without forwarding provider tokens into app state.
+- **Payment models**: Models parse provider payloads and normalize outcomes (success, failed, pending), including both Advansis Pay and GTPay flows.
 
 **Section sources**
 - [token_store.dart:20-23](file://lib/core/network/token_store.dart#L20-L23)
 - [token_store.dart:46-69](file://lib/core/network/token_store.dart#L46-L69)
 - [token_store.dart:71-88](file://lib/core/network/token_store.dart#L71-L88)
+- [pending_payment_store.dart:12-16](file://lib/features/payments/data/pending_payment_store.dart#L12-L16)
+- [pending_payment_store.dart:65-94](file://lib/features/payments/data/pending_payment_store.dart#L65-L94)
 - [api_client.dart:13-15](file://lib/core/network/api_client.dart#L13-L15)
 - [api_client.dart:86-113](file://lib/core/network/api_client.dart#L86-L113)
 - [deep_links.dart:63-75](file://lib/core/deep_links.dart#L63-L75)
@@ -178,6 +199,39 @@ Key behaviors:
 - [token_store.dart:120-146](file://lib/core/network/token_store.dart#L120-L146)
 - [token_store.dart:177-217](file://lib/core/network/token_store.dart#L177-L217)
 
+### Encrypted Payment Data Storage with SecretStore Abstraction
+**Updated** The pending payment system now uses a sophisticated two-tier storage approach where sensitive payment data is separated from non-sensitive data through the SecretStore abstraction.
+
+```mermaid
+flowchart TD
+Save(["Save Pending Payment"]) --> ExtractSensitive["Extract sensitive fields<br/>(token, momoNumber)"]
+ExtractSensitive --> EncryptSensitive["Encrypt sensitive fields<br/>in SecretStore"]
+EncryptSensitive --> RemoveFromJSON["Remove sensitive fields<br/>from JSON"]
+RemoveFromJSON --> SaveNonSensitive["Save non-sensitive data<br/>to SharedPreferences"]
+Load(["Load Pending Payment"]) --> LoadJSON["Load JSON from<br/>SharedPreferences"]
+LoadJSON --> LoadSensitive["Load sensitive fields<br/>from SecretStore"]
+LoadSensitive --> MergeData["Merge sensitive +<br/>non-sensitive data"]
+MergeData --> ReturnPayment["Return complete<br/>PendingPayment object"]
+```
+
+Key security features:
+- **Field-level encryption**: Only sensitive fields (verification tokens, MoMo wallet numbers) are encrypted
+- **Graceful degradation**: Falls back to plaintext if keystore is unavailable
+- **Legacy migration**: Automatically migrates old plaintext data to encrypted storage
+- **Memory caching**: Sensitive data cached in memory for synchronous access
+
+**Diagram sources**
+- [pending_payment_store.dart:65-94](file://lib/features/payments/data/pending_payment_store.dart#L65-L94)
+- [pending_payment_store.dart:96-109](file://lib/features/payments/data/pending_payment_store.dart#L96-L109)
+- [pending_payment_store.dart:31-63](file://lib/features/payments/data/pending_payment_store.dart#L31-L63)
+
+**Section sources**
+- [pending_payment_store.dart:12-16](file://lib/features/payments/data/pending_payment_store.dart#L12-L16)
+- [pending_payment_store.dart:17-26](file://lib/features/payments/data/pending_payment_store.dart#L17-L26)
+- [pending_payment_store.dart:31-63](file://lib/features/payments/data/pending_payment_store.dart#L31-L63)
+- [pending_payment_store.dart:65-94](file://lib/features/payments/data/pending_payment_store.dart#L65-L94)
+- [pending_payment_store.dart:96-109](file://lib/features/payments/data/pending_payment_store.dart#L96-L109)
+
 ### Secure API Communication and Audit Logging
 The API client:
 - Adds Authorization headers with bearer tokens.
@@ -250,7 +304,7 @@ end
 ### Payment Models and Fraud-Resistant Outcome Classification
 Models parse provider payloads and classify outcomes robustly:
 - Advansis Pay: Considers status, resultText, and originalResponse.result to determine success/failed/pending.
-- GTPay: Uses provider’s Status field (PENDING/COMPLETED/FAILED) and maps to normalized outcomes.
+- GTPay: Uses provider's Status field (PENDING/COMPLETED/FAILED) and maps to normalized outcomes.
 
 ```mermaid
 flowchart TD
@@ -278,8 +332,10 @@ graph LR
 App["lib/app.dart"] --> DeepLinks["lib/core/deep_links.dart"]
 App --> ApiClient["lib/core/network/api_client.dart"]
 ApiClient --> TokenStore["lib/core/network/token_store.dart"]
+ApiClient --> PendingPaymentStore["lib/features/payments/data/pending_payment_store.dart"]
 ApiClient --> Endpoints["lib/core/network/api_endpoints.dart"]
 DeepLinks --> PaymentModels["lib/features/payments/data/payment_models.dart"]
+PendingPaymentStore --> SecretStore["lib/core/network/token_store.dart"]
 ```
 
 **Diagram sources**
@@ -288,6 +344,7 @@ DeepLinks --> PaymentModels["lib/features/payments/data/payment_models.dart"]
 - [api_client.dart:13-24](file://lib/core/network/api_client.dart#L13-L24)
 - [api_endpoints.dart:6-108](file://lib/core/network/api_endpoints.dart#L6-L108)
 - [token_store.dart:71-88](file://lib/core/network/token_store.dart#L71-L88)
+- [pending_payment_store.dart:17-26](file://lib/features/payments/data/pending_payment_store.dart#L17-L26)
 - [payment_models.dart:5-49](file://lib/features/payments/data/payment_models.dart#L5-L49)
 
 **Section sources**
@@ -298,8 +355,7 @@ DeepLinks --> PaymentModels["lib/features/payments/data/payment_models.dart"]
 - Sensitive log redaction prevents accidental leakage while retaining useful debugging context.
 - Deep link parking avoids blocking startup and ensures callbacks are delivered once.
 - Platform secure storage minimizes disk I/O overhead by keeping an in-memory mirror for interceptors.
-
-[No sources needed since this section provides general guidance]
+- **Two-tier storage optimization**: Non-sensitive payment data is accessed synchronously from SharedPreferences while sensitive data is loaded asynchronously from encrypted storage.
 
 ## Troubleshooting Guide
 Common issues and mitigations:
@@ -307,6 +363,7 @@ Common issues and mitigations:
 - Corrupted secret store: Startup degrades gracefully to signed-out instead of crashing.
 - Duplicate callback navigation: The deep link handler avoids stacking duplicate payment callback screens.
 - Missing deep link channels: Initialization failures do not block startup; payments simply lose the instant-return path.
+- **Keystore unavailability**: If encrypted storage fails, the system falls back to plaintext storage to maintain functionality.
 
 Operational recommendations:
 - Use X-Request-Id to correlate logs across network calls.
@@ -319,10 +376,11 @@ Operational recommendations:
 - [token_store.dart:120-146](file://lib/core/network/token_store.dart#L120-L146)
 - [deep_links.dart:27-51](file://lib/core/deep_links.dart#L27-L51)
 - [deep_links.dart:146-155](file://lib/core/deep_links.dart#L146-L155)
+- [pending_payment_store.dart:87-90](file://lib/features/payments/data/pending_payment_store.dart#L87-L90)
 - [payments-refunds.html:35-38](file://web/payments-refunds.html#L35-L38)
 
 ## Conclusion
-LidaPay implements strong security controls for payment data: encrypted token storage, secure HTTPS communication, sensitive data redaction, robust token refresh, and careful handling of payment provider callbacks. The app’s models normalize provider outcomes to reduce ambiguity and improve fraud resilience. Legal pages document data handling, retention, and deletion practices. Together, these measures align with industry expectations for secure payment processing and provide a solid foundation for PCI DSS and GDPR compliance, as well as adherence to local financial regulations in Ghana.
+LidaPay implements strong security controls for payment data: encrypted token storage, secure HTTPS communication, sensitive data redaction, robust token refresh, and careful handling of payment provider callbacks. The app's models normalize provider outcomes to reduce ambiguity and improve fraud resilience. Legal pages document data handling, retention, and deletion practices. Together, these measures align with industry expectations for secure payment processing and provide a solid foundation for PCI DSS and GDPR compliance, as well as adherence to local financial regulations in Ghana.
 
 [No sources needed since this section summarizes without analyzing specific files]
 
@@ -332,10 +390,13 @@ LidaPay implements strong security controls for payment data: encrypted token st
 - Secrets are written to platform secure storage (Android secure storage or iOS Keychain).
 - iOS Keychain accessibility is restricted to first unlock on the current device.
 - Legacy plaintext preferences are migrated and removed during startup.
+- **Two-tier storage pattern**: Sensitive fields (tokens, MoMo numbers) stored separately in encrypted storage while non-sensitive data remains in SharedPreferences.
 
 **Section sources**
 - [token_store.dart:46-69](file://lib/core/network/token_store.dart#L46-L69)
 - [token_store.dart:120-146](file://lib/core/network/token_store.dart#L120-L146)
+- [pending_payment_store.dart:12-16](file://lib/features/payments/data/pending_payment_store.dart#L12-L16)
+- [pending_payment_store.dart:65-94](file://lib/features/payments/data/pending_payment_store.dart#L65-L94)
 
 ### PCI DSS Compliance Considerations
 - Do not store cardholder PAN, CVV, or track data in the app or logs.
@@ -343,8 +404,7 @@ LidaPay implements strong security controls for payment data: encrypted token st
 - Enforce TLS for all network traffic and validate server certificates.
 - Implement least privilege and role-based access for backend services.
 - Maintain audit trails for authentication and payment events.
-
-[No sources needed since this section provides general guidance]
+- **Enhanced**: Sensitive payment tokens and MoMo wallet numbers are now stored in platform secure storage rather than application preferences.
 
 ### GDPR Considerations for Payment Data
 - Collect only necessary personal data and explain purposes clearly.
@@ -383,10 +443,12 @@ LidaPay implements strong security controls for payment data: encrypted token st
 - Avoid storing credentials or passwords; use refresh tokens where supported.
 - Clear sessions on logout and on rejected refresh attempts.
 - Support optional biometric sign-in with separate, revocable session material.
+- **Enhanced**: Payment verification tokens and MoMo wallet numbers are now stored in encrypted storage via SecretStore abstraction.
 
 **Section sources**
 - [token_store.dart:71-88](file://lib/core/network/token_store.dart#L71-L88)
 - [token_store.dart:177-217](file://lib/core/network/token_store.dart#L177-L217)
+- [pending_payment_store.dart:65-94](file://lib/features/payments/data/pending_payment_store.dart#L65-L94)
 
 ### Audit Logging for Payment Transactions
 - Log request methods, endpoints, and sanitized bodies in debug mode.
@@ -401,7 +463,50 @@ LidaPay implements strong security controls for payment data: encrypted token st
 - Development: Enable verbose logging with redaction; use test doubles for secure storage.
 - Testing: Mock secure storage and shared preferences; verify graceful degradation on corrupted stores.
 - Production: Use release builds with hardened configurations; ensure Play signing and private keystore management.
+- **Enhanced**: Test environments use MemorySecretStore while production uses SecureSecretStore with platform keystore/keychain.
 
 **Section sources**
 - [README.md:15-25](file://README.md#L15-L25)
 - [token_store.dart:32-44](file://lib/core/network/token_store.dart#L32-L44)
+- [main.dart:103-131](file://lib/main.dart#L103-L131)
+
+### SecretStore Abstraction Pattern
+The SecretStore abstraction provides a unified interface for secure data storage across different platforms and environments:
+
+```mermaid
+classDiagram
+class SecretStore {
+<<abstract>>
++read(key) String?
++write(key, value) void
++delete(key) void
+}
+class MemorySecretStore {
+-_values Map~String,String~
++read(key) String?
++write(key, value) void
++delete(key) void
+}
+class SecureSecretStore {
+-_storage FlutterSecureStorage
++read(key) String?
++write(key, value) void
++delete(key) void
+}
+SecretStore <|-- MemorySecretStore
+SecretStore <|-- SecureSecretStore
+```
+
+Key benefits:
+- **Platform abstraction**: Same interface for Android Keystore, iOS Keychain, and in-memory storage
+- **Testability**: Easy mocking for unit tests
+- **Fallback support**: Graceful degradation when secure storage is unavailable
+- **Consistent usage**: Both TokenStore and PendingPaymentStore use the same pattern
+
+**Diagram sources**
+- [token_store.dart:26-69](file://lib/core/network/token_store.dart#L26-L69)
+
+**Section sources**
+- [token_store.dart:20-23](file://lib/core/network/token_store.dart#L20-L23)
+- [token_store.dart:26-69](file://lib/core/network/token_store.dart#L26-L69)
+- [pending_payment_store.dart:17-26](file://lib/features/payments/data/pending_payment_store.dart#L17-L26)

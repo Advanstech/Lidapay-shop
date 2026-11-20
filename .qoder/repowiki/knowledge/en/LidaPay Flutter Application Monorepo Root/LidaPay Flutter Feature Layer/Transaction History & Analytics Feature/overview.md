@@ -1,0 +1,1 @@
+Flutter feature exposing a paginated, filterable merged transaction ledger and an analytics view that aggregates spend, outcomes, and generated insights via Riverpod providers.

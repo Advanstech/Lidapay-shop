@@ -1,0 +1,13 @@
+schema_version: 1
+module_path: ""
+title: LidaPay Flutter Application Monorepo Root
+scope:
+    - README.md
+    - pubspec.yaml
+    - analysis_options.yaml
+    - devtools_options.yaml
+    - .gitignore
+    - pubspec.lock
+source_files: []
+depends_on: []
+related_to: []

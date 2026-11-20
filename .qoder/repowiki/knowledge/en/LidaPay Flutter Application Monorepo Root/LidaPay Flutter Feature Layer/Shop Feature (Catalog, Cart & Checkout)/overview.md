@@ -1,0 +1,1 @@
+Flutter Riverpod feature providing product browsing, cart management, checkout with idempotency recovery, order history and live delivery tracking for the LidaPay shop.

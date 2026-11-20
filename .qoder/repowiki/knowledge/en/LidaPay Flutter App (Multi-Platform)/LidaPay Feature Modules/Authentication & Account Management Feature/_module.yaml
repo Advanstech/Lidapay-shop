@@ -1,8 +1,0 @@
-schema_version: 1
-module_path: lib_features/auth
-title: Authentication & Account Management Feature
-scope:
-    - lib/features/auth/
-source_files: []
-depends_on: []
-related_to: []

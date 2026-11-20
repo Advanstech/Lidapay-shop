@@ -1,1 +1,0 @@
-Flutter feature module providing airtime/data top-up, Lida Value wallet operations, Lida Points redemption, and Invite & Earn screens backed by Reloadly, Prymo, GTBank and internal APIs.

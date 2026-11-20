@@ -1,0 +1,1 @@
+Flutter Android application shell providing the native entry point, Gradle build configuration, release signing, Google Services integration, and resource assets for the Lidapay app.

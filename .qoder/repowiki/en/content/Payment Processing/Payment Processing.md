@@ -14,7 +14,17 @@
 - [deep_links.dart](file://lib/core/deep_links.dart)
 - [app_constants.dart](file://lib/core/constants/app_constants.dart)
 - [api_endpoints.md](file://api/ENDPOINTS.md)
+- [lida_value_providers.dart](file://lib/features/lida_value/providers.dart)
+- [lv_attempt_store.dart](file://lib/features/lida_value/data/lv_attempt_store.dart)
 </cite>
+
+## Update Summary
+**Changes Made**
+- Added comprehensive documentation for Lida Value transaction reliability enhancements
+- Documented new persistent attempt tracking system with LvAttempt and LvAttemptStore
+- Updated retry mechanisms and error handling for wallet-funded transactions
+- Enhanced section on transaction state management to include Lida Value phases
+- Added detailed coverage of idempotency protection and automatic recovery mechanisms
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -30,19 +40,20 @@
 ## Introduction
 This document explains the payment processing system used by the application for service purchases and shop orders. It covers:
 
-- Payment method selection between Mobile Money and card payments.
+- Payment method selection between Mobile Money, card payments, and Lida Value wallet funding.
 - Mobile Money integration through GTPay debitwallet.
 - Card payment processing through ExpressPay via Advansis Pay.
+- Lida Value wallet transactions with enhanced reliability, persistent attempt tracking, and automatic retry mechanisms.
 - Transaction status monitoring, polling, and reconciliation.
 - Payment history and receipt handling after successful delivery.
 - Pending payment persistence and transaction state management.
 - Error handling, retry logic, and user notification patterns.
 - Security considerations and compliance implications.
 
-The implementation is centered around a single payment session that coordinates initiation, verification, crediting, and completion while keeping sensitive data out of normal app storage.
+The implementation is centered around a single payment session that coordinates initiation, verification, crediting, and completion while keeping sensitive data out of normal app storage. The system now includes robust Lida Value transaction handling that survives process death and prevents double-charging through persistent attempt tracking.
 
 ## Project Structure
-Payment functionality lives under `lib/features/payments` with supporting core utilities and API endpoints documented separately.
+Payment functionality lives under `lib/features/payments` with supporting core utilities and API endpoints documented separately. Lida Value functionality extends this with dedicated providers and persistent attempt storage.
 
 ```mermaid
 graph TB
@@ -56,6 +67,11 @@ RepoInterface["Repository Interface<br/>payments_repository.dart"]
 MethodSelector["Method Selector UI<br/>payment_method_selector.dart"]
 AwaitingPanel["Awaiting Panel UI<br/>payment_awaiting_panel.dart"]
 ReturnScreen["Return Screen<br/>payment_return_screen.dart"]
+end
+subgraph "Lida Value Feature"
+LVProviders["Lida Value Providers<br/>lida_value_providers.dart"]
+LVStore["LvAttempt Store<br/>lv_attempt_store.dart"]
+LVState["Lida Topup State<br/>LidaTopupPhase"]
 end
 subgraph "Core"
 DeepLinks["Deep Link Handler<br/>deep_links.dart"]
@@ -75,10 +91,16 @@ AwaitingPanel --> Providers
 DeepLinks --> ReturnScreen
 Providers --> Constants
 Repo --> Endpoints
+LVProviders --> LVStore
+LVProviders --> PendingModel
+LVProviders --> Providers
+LVStore --> PendingModel
 ```
 
 **Diagram sources**
 - [providers.dart:120-178](file://lib/features/payments/providers.dart#L120-L178)
+- [lida_value_providers.dart:79-91](file://lib/features/lida_value/providers.dart#L79-L91)
+- [lv_attempt_store.dart:81-109](file://lib/features/lida_value/data/lv_attempt_store.dart#L81-L109)
 - [payment_models.dart:5-49](file://lib/features/payments/data/payment_models.dart#L5-L49)
 - [pending_payment.dart:16-87](file://lib/features/payments/data/pending_payment.dart#L16-L87)
 - [pending_payment_store.dart:8-26](file://lib/features/payments/data/pending_payment_store.dart#L8-L26)
@@ -93,6 +115,8 @@ Repo --> Endpoints
 
 **Section sources**
 - [providers.dart:120-178](file://lib/features/payments/providers.dart#L120-L178)
+- [lida_value_providers.dart:79-91](file://lib/features/lida_value/providers.dart#L79-L91)
+- [lv_attempt_store.dart:81-109](file://lib/features/lida_value/data/lv_attempt_store.dart#L81-L109)
 - [payment_models.dart:5-49](file://lib/features/payments/data/payment_models.dart#L5-L49)
 - [pending_payment.dart:16-87](file://lib/features/payments/data/pending_payment.dart#L16-L87)
 - [pending_payment_store.dart:8-26](file://lib/features/payments/data/pending_payment_store.dart#L8-L26)
@@ -107,9 +131,11 @@ Repo --> Endpoints
 
 ## Core Components
 - Payment session orchestrator: manages phases, initiation, verification, crediting, retries, and cancellation.
+- Lida Value topup orchestrator: handles wallet-funded transactions with persistent attempt tracking and automatic recovery.
 - Payment models: parse gateway responses and classify outcomes as success, failed, or pending.
 - Pending payment model: represents an in-flight purchase with kind-specific delivery parameters.
 - Pending payment store: persists the purchase record and encrypts sensitive fields.
+- LvAttempt store: persists Lida Value transaction attempts across process death for reliability.
 - Remote payments repository: calls backend endpoints for Advansis Pay and GTPay.
 - Repository interface: defines the contract for payment operations.
 - UI components: method selector, awaiting panel, and return screen.
@@ -117,18 +143,21 @@ Repo --> Endpoints
 - App constants: checkout host allowlist and shop redirect URL.
 
 Key responsibilities:
-- Selection: decide between Mobile Money and card.
-- Initiation: create checkout or MoMo prompt.
+- Selection: decide between Mobile Money, card, or Lida Value funding.
+- Initiation: create checkout, MoMo prompt, or Lida Value debit.
 - Verification: poll provider status until success, failure, or timeout.
 - Crediting: deliver the service or mark the shop order paid.
 - Persistence: survive process death and resume safely.
 - User feedback: guide users through approval, recheck, retry, and cancellation.
+- Idempotency: prevent double-charging through persistent client references.
 
 **Section sources**
 - [providers.dart:43-85](file://lib/features/payments/providers.dart#L43-L85)
+- [lida_value_providers.dart:33-64](file://lib/features/lida_value/providers.dart#L33-L64)
 - [payment_models.dart:51-163](file://lib/features/payments/data/payment_models.dart#L51-L163)
 - [pending_payment.dart:16-87](file://lib/features/payments/data/pending_payment.dart#L16-L87)
 - [pending_payment_store.dart:8-26](file://lib/features/payments/data/pending_payment_store.dart#L8-L26)
+- [lv_attempt_store.dart:17-78](file://lib/features/lida_value/data/lv_attempt_store.dart#L17-L78)
 - [remote_payments_repository.dart:12-109](file://lib/features/payments/data/remote_payments_repository.dart#L12-L109)
 - [payments_repository.dart:3-45](file://lib/features/payments/data/payments_repository.dart#L3-L45)
 - [payment_method_selector.dart:21-46](file://lib/features/payments/widgets/payment_method_selector.dart#L21-L46)
@@ -138,25 +167,29 @@ Key responsibilities:
 - [app_constants.dart:23-46](file://lib/core/constants/app_constants.dart#L23-L46)
 
 ## Architecture Overview
-The payment flow has two main rails:
+The payment flow has three main rails:
 
 - Card rail: initiate Advansis Pay checkout, open hosted page, verify via token query, then credit or complete.
 - Mobile Money rail: call GTPay debitwallet, poll status using PartnerTransId, then credit or complete.
+- Lida Value rail: debit from wallet ledger, persist attempt, deliver service, with automatic recovery on app restart.
 
-Both rails converge on a single verification-and-credit path to avoid duplicate delivery.
+Both traditional rails converge on a single verification-and-credit path to avoid duplicate delivery. The Lida Value rail adds persistent attempt tracking to ensure delivery completion even if the app crashes after wallet debit but before service delivery.
 
 ```mermaid
 sequenceDiagram
 participant User as "User"
 participant UI as "Payment UI"
 participant Session as "PaymentSessionNotifier"
+participant LVSession as "LidaValueTopupNotifier"
 participant Store as "PendingPaymentStore"
+participant LVStore as "LvAttemptStore"
 participant Repo as "RemotePaymentsRepository"
 participant Backend as "Backend API"
 participant Gateway as "ExpressPay / GTPay"
+participant Wallet as "Lida Value Wallet"
 User->>UI : Select payment method
-UI->>Session : beginPayment(draft, method, momoNumber?)
 alt Card
+UI->>Session : beginPayment(draft, method=card)
 Session->>Repo : initiatePayment(...)
 Repo->>Backend : POST advansispay/initiate-payment
 Backend-->>Repo : checkoutUrl, token, orderId
@@ -165,6 +198,7 @@ Session->>Store : save(pending with token)
 Session->>Gateway : launchUrl(checkoutUrl)
 Session->>Session : phase = awaitingCallback
 else Mobile Money
+UI->>Session : beginPayment(draft, method=momo)
 Session->>Store : save(pending with partnerTransId)
 Session->>Repo : gtPayDebit(partnerTransId, momoNumber, amount)
 Repo->>Backend : POST gtpay/pay (debitwallet)
@@ -175,6 +209,16 @@ Session->>Session : _credit(pending)
 else pending or unknown
 Session->>Session : _verifyThenCredit(pending)
 end
+else Lida Value
+UI->>LVSession : execute(draft, funding=lidaValueUse/lidaValueSend)
+LVSession->>LVStore : save(attempt with clientReference)
+LVSession->>Wallet : useLidaValue() or sendLidaValue()
+Wallet-->>LVSession : debit confirmed
+LVSession->>LVStore : save(attempt with debitReference)
+LVSession->>Backend : deliverPendingPayment()
+Backend-->>LVSession : ServiceReceipt
+LVSession->>LVStore : clear(attempt)
+LVSession->>LVSession : phase = completed
 end
 Note over Session,Gateway : Deep link or manual recheck triggers verification
 Session->>Repo : queryTransaction(token) or gtPayStatus(partnerTransId)
@@ -193,6 +237,7 @@ end
 - [providers.dart:283-367](file://lib/features/payments/providers.dart#L283-L367)
 - [providers.dart:474-572](file://lib/features/payments/providers.dart#L474-L572)
 - [providers.dart:578-665](file://lib/features/payments/providers.dart#L578-L665)
+- [lida_value_providers.dart:157-331](file://lib/features/lida_value/providers.dart#L157-L331)
 - [remote_payments_repository.dart:12-109](file://lib/features/payments/data/remote_payments_repository.dart#L12-L109)
 - [payment_return_screen.dart:54-66](file://lib/features/payments/screens/payment_return_screen.dart#L54-L66)
 - [deep_links.dart:64-72](file://lib/core/deep_links.dart#L64-L72)
@@ -201,24 +246,31 @@ end
 ## Detailed Component Analysis
 
 ### Payment Method Selection
-The payment sheet lets users choose between Mobile Money and Debit/Credit Card. For Mobile Money, it supports default registered wallets and custom wallet entry with network detection. For cards, it directs users to the ExpressPay hosted checkout.
+The payment sheet lets users choose between Mobile Money, Debit/Credit Card, or Lida Value funding. For Mobile Money, it supports default registered wallets and custom wallet entry with network detection. For cards, it directs users to the ExpressPay hosted checkout. For Lida Value, it checks wallet balance and offers the option to switch to standard payment methods if insufficient funds are available.
 
 Important behaviors:
 - Mobile Money shows MTN, Telecel Cash, and AirtelTigo options.
 - Default wallet can be selected or replaced by a custom number.
 - Card option indicates 3-D Secure verification happens on ExpressPay.
+- Lida Value option shows available balance and may offer fallback to standard payment methods.
 - The sheet returns a structured choice including method, optional MoMo number, and network label.
 
 ```mermaid
 flowchart TD
-Start(["Open Payment Sheet"]) --> ShowOptions["Show Mobile Money and Card options"]
+Start(["Open Payment Sheet"]) --> ShowOptions["Show Mobile Money, Card, and Lida Value options"]
 ShowOptions --> Choice{"User selects"}
 Choice --> |Mobile Money| ValidateMomo["Validate 10-digit Ghana MoMo number"]
 Choice --> |Card| LaunchCard["Launch ExpressPay checkout"]
+Choice --> |Lida Value| CheckBalance["Check Lida Value balance"]
 ValidateMomo --> Ready{"Valid?"}
 Ready --> |Yes| ConfirmMomo["Confirm MoMo payment"]
 Ready --> |No| ShowError["Show validation error"]
+CheckBalance --> Sufficient{"Sufficient funds?"}
+Sufficient --> |Yes| ConfirmLV["Confirm Lida Value payment"]
+Sufficient --> |No| OfferSwitch["Offer switch to standard payment"]
 ConfirmMomo --> ReturnChoice["Return PaymentChoice"]
+ConfirmLV --> ReturnChoice
+OfferSwitch --> ReturnChoice
 LaunchCard --> ReturnChoice
 ShowError --> ShowOptions
 ```
@@ -236,7 +288,7 @@ ShowError --> ShowOptions
 - [payment_method_selector.dart:452-538](file://lib/features/payments/widgets/payment_method_selector.dart#L452-L538)
 
 ### Mobile Money Integration (GTPay)
-Mobile Money uses GTPay’s debitwallet service. The flow generates a unique PartnerTransId before calling pay, persists it, and reconciles any timeout or partial response through status polling.
+Mobile Money uses GTPay's debitwallet service. The flow generates a unique PartnerTransId before calling pay, persists it, and reconciles any timeout or partial response through status polling.
 
 Key points:
 - Phone numbers are normalized to local 10-digit format.
@@ -285,6 +337,48 @@ end
 - [providers.dart:578-665](file://lib/features/payments/providers.dart#L578-L665)
 - [remote_payments_repository.dart:64-109](file://lib/features/payments/data/remote_payments_repository.dart#L64-L109)
 - [api_endpoints.md:185-192](file://api/ENDPOINTS.md#L185-L192)
+
+### Lida Value Transaction Reliability
+Lida Value transactions now feature enhanced reliability through persistent attempt tracking and automatic retry mechanisms. The system ensures that wallet debits are never lost and services are delivered even if the app crashes during the process.
+
+Key reliability features:
+- **Persistent Attempt Tracking**: Each Lida Value transaction creates an `LvAttempt` record that survives process death.
+- **Automatic Recovery**: On app startup, the system automatically resumes any incomplete deliveries.
+- **Idempotency Protection**: Uses `clientReference` to prevent double-charging when retries occur.
+- **Two-Phase Commit**: Separates wallet debit confirmation from service delivery, allowing independent retry.
+- **Enhanced Error Handling**: Distinguishes between known failures and unknown outcomes where wallet charge status is uncertain.
+
+```mermaid
+sequenceDiagram
+participant UI as "Payment UI"
+participant LVSession as "LidaValueTopupNotifier"
+participant LVStore as "LvAttemptStore"
+participant Wallet as "Lida Value Wallet"
+participant Backend as "Backend API"
+UI->>LVSession : execute(draft, funding)
+LVSession->>LVStore : save(attempt with clientReference)
+LVSession->>Wallet : useLidaValue()/sendLidaValue()
+Wallet-->>LVSession : debit confirmed
+LVSession->>LVStore : save(attempt with debitReference)
+LVSession->>Backend : deliverPendingPayment()
+alt success
+Backend-->>LVSession : ServiceReceipt
+LVSession->>LVStore : clear(attempt)
+LVSession->>UI : phase = completed
+else failure
+Backend-->>LVSession : error
+LVSession->>UI : phase = failed (attempt remains stored)
+Note over LVSession : Next app start will auto-retry delivery
+end
+```
+
+**Diagram sources**
+- [lida_value_providers.dart:157-331](file://lib/features/lida_value/providers.dart#L157-L331)
+- [lv_attempt_store.dart:17-78](file://lib/features/lida_value/data/lv_attempt_store.dart#L17-L78)
+
+**Section sources**
+- [lida_value_providers.dart:157-331](file://lib/features/lida_value/providers.dart#L157-L331)
+- [lv_attempt_store.dart:17-78](file://lib/features/lida_value/data/lv_attempt_store.dart#L17-L78)
 
 ### Card Payment Processing (Advansis Pay / ExpressPay)
 Card payments use Advansis Pay to obtain a hosted checkout URL. The app opens the URL externally, stores the token, and verifies the transaction later.
@@ -414,15 +508,23 @@ end
 - [payment_return_screen.dart:120-150](file://lib/features/payments/screens/payment_return_screen.dart#L120-L150)
 - [payment_return_screen.dart:157-204](file://lib/features/payments/screens/payment_return_screen.dart#L157-L204)
 
-### Pending Payment Store and Data Security
-The pending payment store persists the in-flight purchase across process death and separates sensitive fields from general storage.
+### Persistent Storage and Data Security
+The system now includes two layers of persistent storage for maximum reliability:
 
-Security design:
+**Traditional Payment Storage:**
+- The pending payment store persists the in-flight purchase across process death and separates sensitive fields from general storage.
 - Sensitive fields such as the payment token and MoMo number are stored in a secret store backed by platform keystore/keychain.
 - The rest of the pending record is stored in shared preferences.
 - Hydration loads secrets at startup so load can serve tokens synchronously.
 - Legacy plaintext fields are migrated to encrypted storage when possible.
 - Clear removes both persistent and secret fields.
+
+**Lida Value Attempt Storage:**
+- The LvAttempt store persists transaction attempts specifically for Lida Value funded purchases.
+- Stores the complete draft, service type, debit reference (when available), and timestamp.
+- Provides matching logic to identify retry attempts vs new transactions.
+- Uses simple SharedPreferences for durability without encryption (no sensitive data).
+- Automatically cleared upon successful completion or when no longer needed.
 
 ```mermaid
 classDiagram
@@ -430,6 +532,11 @@ class PendingPaymentStore {
 +hydrate() void
 +save(payment) Future~void~
 +load() PendingPayment?
++clear() Future~void~
+}
+class LvAttemptStore {
++save(attempt) Future~void~
++load() LvAttempt?
 +clear() Future~void~
 }
 class PendingPayment {
@@ -450,6 +557,14 @@ class PendingPayment {
 +partnerTransId
 +momoNumber
 }
+class LvAttempt {
++draft
++serviceType
++debitReference
++updatedAt
++isDebited
++matches()
+}
 class SecretStore {
 <<interface>>
 +read(key) Future~String?~
@@ -457,31 +572,44 @@ class SecretStore {
 +delete(key) Future~void~
 }
 PendingPaymentStore --> PendingPayment : "persists"
+LvAttemptStore --> LvAttempt : "persists"
 PendingPaymentStore --> SecretStore : "encrypts token/momo"
+LvAttempt --> PendingPayment : "contains draft"
 ```
 
 **Diagram sources**
 - [pending_payment_store.dart:8-26](file://lib/features/payments/data/pending_payment_store.dart#L8-L26)
 - [pending_payment_store.dart:31-63](file://lib/features/payments/data/pending_payment_store.dart#L31-L63)
 - [pending_payment_store.dart:65-121](file://lib/features/payments/data/pending_payment_store.dart#L65-L121)
+- [lv_attempt_store.dart:81-109](file://lib/features/lida_value/data/lv_attempt_store.dart#L81-L109)
+- [lv_attempt_store.dart:17-78](file://lib/features/lida_value/data/lv_attempt_store.dart#L17-L78)
 - [pending_payment.dart:24-87](file://lib/features/payments/data/pending_payment.dart#L24-L87)
 
 **Section sources**
 - [pending_payment_store.dart:8-26](file://lib/features/payments/data/pending_payment_store.dart#L8-L26)
 - [pending_payment_store.dart:31-63](file://lib/features/payments/data/pending_payment_store.dart#L31-L63)
 - [pending_payment_store.dart:65-121](file://lib/features/payments/data/pending_payment_store.dart#L65-L121)
+- [lv_attempt_store.dart:81-109](file://lib/features/lida_value/data/lv_attempt_store.dart#L81-L109)
+- [lv_attempt_store.dart:17-78](file://lib/features/lida_value/data/lv_attempt_store.dart#L17-L78)
 - [pending_payment.dart:24-87](file://lib/features/payments/data/pending_payment.dart#L24-L87)
 
 ### Transaction State Management
-The payment session tracks phases from idle through initiating, awaiting callback, verifying, crediting, completed, and failed.
+The payment session tracks phases from idle through initiating, awaiting callback, verifying, crediting, completed, and failed. Lida Value transactions have their own state machine with additional phases for wallet operations.
 
-State transitions:
+**Traditional Payment States:**
 - beginPayment sets initiating and saves pending.
 - Card flow moves to awaitingCallback after launching checkout.
 - Mobile Money flow may move directly to success or to verifying/awaitingCallback depending on outcome.
 - _verifyThenCredit centralizes polling and avoids duplicate work.
 - _credit delivers services or marks shop orders paid and clears pending state.
 - cancelPending clears persisted pending and resets session.
+
+**Lida Value States:**
+- Idle → Debiting: When starting wallet-funded transaction.
+- Debiting → Delivering: After successful wallet debit.
+- Delivering → Completed: After successful service delivery.
+- Any State → Failed: On errors, with attempt persistence for recovery.
+- Automatic recovery on app startup for incomplete deliveries.
 
 ```mermaid
 stateDiagram-v2
@@ -497,6 +625,16 @@ Crediting --> Completed : "delivery confirmed"
 AwaitingCallback --> Failed : "cancel / explicit failure"
 Completed --> [*]
 Failed --> [*]
+note right of Idle : Traditional Payment Flow
+[*] --> Idle
+Idle --> Debiting : "execute(Lida Value)"
+Debiting --> Delivering : "wallet debit confirmed"
+Delivering --> Completed : "service delivered"
+Delivering --> Failed : "delivery error"
+Debiting --> Failed : "debit error"
+Completed --> [*]
+Failed --> [*]
+note right of Idle : Lida Value Flow
 ```
 
 **Diagram sources**
@@ -504,17 +642,21 @@ Failed --> [*]
 - [providers.dart:182-277](file://lib/features/payments/providers.dart#L182-L277)
 - [providers.dart:372-468](file://lib/features/payments/providers.dart#L372-L468)
 - [providers.dart:700-769](file://lib/features/payments/providers.dart#L700-L769)
+- [lida_value_providers.dart:33-64](file://lib/features/lida_value/providers.dart#L33-L64)
+- [lida_value_providers.dart:114-155](file://lib/features/lida_value/providers.dart#L114-L155)
 
 **Section sources**
 - [providers.dart:43-85](file://lib/features/payments/providers.dart#L43-L85)
 - [providers.dart:182-277](file://lib/features/payments/providers.dart#L182-L277)
 - [providers.dart:372-468](file://lib/features/payments/providers.dart#L372-L468)
 - [providers.dart:700-769](file://lib/features/payments/providers.dart#L700-L769)
+- [lida_value_providers.dart:33-64](file://lib/features/lida_value/providers.dart#L33-L64)
+- [lida_value_providers.dart:114-155](file://lib/features/lida_value/providers.dart#L114-L155)
 
 ### Payment Failure Scenarios, Retry Logic, and User Notifications
-Failure handling distinguishes provider-reported failures from transient network issues.
+Failure handling distinguishes provider-reported failures from transient network issues. Lida Value transactions add sophisticated retry logic with persistent state management.
 
-Patterns:
+**Traditional Payment Patterns:**
 - Card query failures during polling are treated as unknown unless explicitly failed.
 - Mobile Money status polling stops on timeout and leaves the user in awaitingCallback with provider status.
 - When the network reports failure, users can check status again or send a new prompt.
@@ -522,15 +664,24 @@ Patterns:
 - Cancellation is only safe for unverified initiations; once verified, local cancellation does not reverse provider charges.
 - UI panels provide clear guidance for checking approvals, dialing USSD menus, and choosing next actions.
 
+**Lida Value Enhanced Patterns:**
+- **Automatic Retry**: Failed deliveries are automatically retried on app startup.
+- **Idempotency Protection**: Same clientReference prevents double-charging on retries.
+- **Unknown Outcome Handling**: Distinguishes between confirmed failures and uncertain outcomes where wallet charge status is unknown.
+- **Persistent Recovery**: Even if app crashes after wallet debit, delivery will be attempted on next startup.
+- **Clear User Communication**: Messages indicate whether wallet was charged and what recovery steps are available.
+
 ```mermaid
 flowchart TD
 Start(["Provider reports failure or timeout"]) --> Type{"Type?"}
 Type --> |Card query error| Unknown["Treat as pending if not explicit failure"]
 Type --> |Mobile Money FAILED| NotConfirmed["Awaiting callback with providerStatus"]
 Type --> |Mobile Money timeout| TimedOut["Awaiting callback TIMED_OUT"]
+Type --> |Lida Value delivery error| DeliveryFailed["Attempt persisted for recovery"]
 Unknown --> PollAgain["Allow recheck"]
 NotConfirmed --> Options{"User action"}
 TimedOut --> Options
+DeliveryFailed --> AutoRetry["Auto-retry on app startup"]
 Options --> |Check status| Recheck["Recheck status"]
 Options --> |Send new prompt| Retry["retryMobileMoney(new PartnerTransId)"]
 Options --> |Cancel| Cancel["cancelPending()"]
@@ -541,6 +692,7 @@ Options --> |Cancel| Cancel["cancelPending()"]
 - [providers.dart:527-572](file://lib/features/payments/providers.dart#L527-L572)
 - [providers.dart:602-665](file://lib/features/payments/providers.dart#L602-L665)
 - [providers.dart:670-695](file://lib/features/payments/providers.dart#L670-L695)
+- [lida_value_providers.dart:272-331](file://lib/features/lida_value/providers.dart#L272-L331)
 - [payment_awaiting_panel.dart:82-103](file://lib/features/payments/widgets/payment_awaiting_panel.dart#L82-L103)
 - [payment_awaiting_panel.dart:232-421](file://lib/features/payments/widgets/payment_awaiting_panel.dart#L232-L421)
 
@@ -549,6 +701,7 @@ Options --> |Cancel| Cancel["cancelPending()"]
 - [providers.dart:527-572](file://lib/features/payments/providers.dart#L527-L572)
 - [providers.dart:602-665](file://lib/features/payments/providers.dart#L602-L665)
 - [providers.dart:670-695](file://lib/features/payments/providers.dart#L670-L695)
+- [lida_value_providers.dart:272-331](file://lib/features/lida_value/providers.dart#L272-L331)
 - [payment_awaiting_panel.dart:82-103](file://lib/features/payments/widgets/payment_awaiting_panel.dart#L82-L103)
 - [payment_awaiting_panel.dart:232-421](file://lib/features/payments/widgets/payment_awaiting_panel.dart#L232-L421)
 
@@ -591,7 +744,7 @@ end
 - [providers.dart:372-421](file://lib/features/payments/providers.dart#L372-L421)
 
 ## Dependency Analysis
-The payment subsystem depends on repositories, UI providers, deep linking, constants, and backend endpoints.
+The payment subsystem depends on repositories, UI providers, deep linking, constants, and backend endpoints. Lida Value functionality adds dependencies on the services repository and persistent attempt storage.
 
 ```mermaid
 graph LR
@@ -599,6 +752,9 @@ Provider["PaymentSessionNotifier"] --> Repo["RemotePaymentsRepository"]
 Provider --> Store["PendingPaymentStore"]
 Provider --> Models["Payment Models"]
 Provider --> Pending["PendingPayment Model"]
+LVProvider["LidaValueTopupNotifier"] --> Services["ServicesRepository"]
+LVProvider --> LVStore["LvAttemptStore"]
+LVProvider --> Pending
 Repo --> Endpoint["Backend Endpoints"]
 Return["PaymentReturnScreen"] --> Provider
 Method["PaymentMethodSelector"] --> Provider
@@ -609,6 +765,7 @@ Const["AppConstants"] --> Provider
 
 **Diagram sources**
 - [providers.dart:120-178](file://lib/features/payments/providers.dart#L120-L178)
+- [lida_value_providers.dart:79-91](file://lib/features/lida_value/providers.dart#L79-L91)
 - [remote_payments_repository.dart:12-109](file://lib/features/payments/data/remote_payments_repository.dart#L12-L109)
 - [payment_models.dart:5-49](file://lib/features/payments/data/payment_models.dart#L5-L49)
 - [pending_payment.dart:16-87](file://lib/features/payments/data/pending_payment.dart#L16-L87)
@@ -620,6 +777,7 @@ Const["AppConstants"] --> Provider
 
 **Section sources**
 - [providers.dart:120-178](file://lib/features/payments/providers.dart#L120-L178)
+- [lida_value_providers.dart:79-91](file://lib/features/lida_value/providers.dart#L79-L91)
 - [remote_payments_repository.dart:12-109](file://lib/features/payments/data/remote_payments_repository.dart#L12-L109)
 - [payment_models.dart:5-49](file://lib/features/payments/data/payment_models.dart#L5-L49)
 - [pending_payment.dart:16-87](file://lib/features/payments/data/pending_payment.dart#L16-L87)
@@ -636,18 +794,21 @@ Const["AppConstants"] --> Provider
 - Single-flight verification avoids duplicate queries when deep links or resume events occur.
 - Timeout handling for mobile money status queries prevents long hangs.
 - UI remains responsive by separating busy states from user-waiting states.
+- Lida Value operations are lightweight since they primarily involve wallet ledger updates rather than external gateway interactions.
 
 Recommendations:
 - Keep polling attempts conservative to balance responsiveness and reliability.
 - Prefer server-side callbacks where possible to reduce client polling.
 - Monitor backend latency and adjust timeouts accordingly.
 - Avoid unnecessary re-fetches by relying on feed invalidation only on completion.
+- Leverage persistent storage to minimize redundant network calls for recovery scenarios.
 
 [No sources needed since this section provides general guidance]
 
 ## Troubleshooting Guide
 Common issues and resolutions:
 
+**Traditional Payment Issues:**
 - No pending payment found on return:
   - Indicates no active purchase or cleared state; show generic failure and guide user to history or support.
 - Checkout URL invalid or not launchable:
@@ -661,21 +822,33 @@ Common issues and resolutions:
 - Delivery failure after payment confirmation:
   - Keep pending record so user can retry crediting without paying again.
 
+**Lida Value Specific Issues:**
+- **App crash after wallet debit**: System automatically resumes delivery on next startup.
+- **Double charge prevention**: ClientReference ensures retries don't charge twice.
+- **Unknown wallet charge status**: User should check balance and retry; system won't charge again for same reference.
+- **Stuck in delivering state**: Check network connectivity and try again; system will auto-retry on app restart.
+
 Operational tips:
 - Use the awaiting panel to expose actionable steps: reopen checkout, check status, send new prompt, cancel.
 - Log provider status and messages for diagnostics without exposing sensitive tokens.
 - Ensure secret store hydration succeeds; otherwise degrade gracefully and ask user to recheck.
+- Monitor LvAttemptStore for stuck attempts that need manual intervention.
+- Test recovery scenarios by killing app mid-transaction to verify automatic retry works.
 
 **Section sources**
 - [providers.dart:235-277](file://lib/features/payments/providers.dart#L235-L277)
 - [providers.dart:372-421](file://lib/features/payments/providers.dart#L372-L421)
 - [providers.dart:602-665](file://lib/features/payments/providers.dart#L602-L665)
 - [providers.dart:730-753](file://lib/features/payments/providers.dart#L730-L753)
+- [lida_value_providers.dart:114-155](file://lib/features/lida_value/providers.dart#L114-L155)
+- [lida_value_providers.dart:272-331](file://lib/features/lida_value/providers.dart#L272-L331)
 - [payment_awaiting_panel.dart:82-103](file://lib/features/payments/widgets/payment_awaiting_panel.dart#L82-L103)
 - [payment_awaiting_panel.dart:232-421](file://lib/features/payments/widgets/payment_awaiting_panel.dart#L232-L421)
 
 ## Conclusion
-The payment processing system provides a robust, secure, and user-friendly flow for both Mobile Money and card payments. It centralizes verification, protects sensitive data, handles asynchronous provider behavior, and offers clear user guidance throughout the process. By combining careful state management, bounded polling, and resilient error handling, the system minimizes double charges and maximizes recovery from transient failures.
+The payment processing system provides a robust, secure, and user-friendly flow for both Mobile Money, card, and Lida Value wallet payments. It centralizes verification, protects sensitive data, handles asynchronous provider behavior, and offers clear user guidance throughout the process. The enhanced Lida Value transaction reliability with persistent attempt tracking, automatic retry mechanisms, and improved error handling significantly improves the user experience by preventing lost transactions and ensuring services are delivered even in failure scenarios.
+
+By combining careful state management, bounded polling, resilient error handling, and persistent recovery mechanisms, the system minimizes double charges and maximizes recovery from transient failures. The addition of Lida Value funding provides users with a convenient alternative payment method while maintaining the same high standards of reliability and security.
 
 For production hardening:
 - Pin checkout allowed hosts at build time.
@@ -683,5 +856,7 @@ For production hardening:
 - Extend observability around provider status and polling outcomes.
 - Continuously validate deep link routing and return semantics.
 - Review security posture regularly, especially secret store usage and token handling.
+- Monitor Lida Value attempt recovery rates and investigate any stuck attempts.
+- Test edge cases involving app crashes during wallet operations to ensure recovery works correctly.
 
 [No sources needed since this section summarizes without analyzing specific files]

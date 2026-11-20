@@ -1,0 +1,1 @@
+Flutter widget and unit tests for the LidaPay app, exercising auth, payments, notifications, shop, history, legal, and service flows against deterministic mock repositories.

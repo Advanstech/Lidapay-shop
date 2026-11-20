@@ -1,1 +1,0 @@
-Flutter feature providing the user's merged transaction ledger with filtering, pagination, and an analytics page that aggregates spend, outcomes, and generated insights.

@@ -1,0 +1,1 @@
+Flutter feature providing Lida Value wallet balance, history, and top-up flows (USE self / SEND others) plus conversion of LV into mobile money or bank destinations.

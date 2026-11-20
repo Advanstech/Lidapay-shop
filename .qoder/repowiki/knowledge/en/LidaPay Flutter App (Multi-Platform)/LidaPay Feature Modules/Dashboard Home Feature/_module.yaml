@@ -1,9 +1,0 @@
-schema_version: 1
-module_path: lib_features/dashboard
-title: Dashboard Home Feature
-scope:
-    - lib/features/dashboard/
-source_files: []
-depends_on: []
-related_to:
-    - path: lib_features/history

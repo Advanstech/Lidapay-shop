@@ -12,6 +12,14 @@
 - [pubspec.yaml](file://pubspec.yaml)
 </cite>
 
+## Update Summary
+**Changes Made**
+- Updated ProGuard/R8 configuration section with enhanced optimization rules
+- Added detailed information about debug symbol generation for crash reporting
+- Enhanced build performance considerations with new Gradle JVM settings
+- Updated troubleshooting guide with new optimization-related issues
+- Revised conclusion to reflect enhanced build optimizations
+
 ## Table of Contents
 1. [Introduction](#introduction)
 2. [Project Structure](#project-structure)
@@ -25,12 +33,12 @@
 10. [Appendices](#appendices)
 
 ## Introduction
-This document provides comprehensive Android build and deployment guidance for the Flutter-based LidaPay application. It covers Gradle configuration, signing setup for release builds, Google Play Store submission workflow, environment variables and keystore management, ProGuard/R8 rules, build variants, performance tuning, Firebase integration, crash reporting, and production monitoring. The instructions are derived from the repository’s Android Gradle files, manifest, and Flutter configuration.
+This document provides comprehensive Android build and deployment guidance for the Flutter-based LidaPay application. It covers Gradle configuration, signing setup for release builds, Google Play Store submission workflow, environment variables and keystore management, ProGuard/R8 rules with enhanced optimization, build variants, performance tuning, Firebase integration, crash reporting, and production monitoring. The instructions are derived from the repository's Android Gradle files, manifest, and Flutter configuration.
 
 ## Project Structure
 The Android module is a standard Flutter Android app under android/app with shared Gradle configuration at the project root. Key artifacts:
 - Root-level Gradle configuration defines repositories, build directories, and plugin versions.
-- App-level Gradle configures SDKs, signing, minification, and dependencies.
+- App-level Gradle configures SDKs, signing, minification, resource shrinking, and NDK symbol generation.
 - Manifest declares permissions, intent filters, and Google Maps API key injection via placeholders.
 - Google services JSON wires Firebase to the Android package.
 - Flutter pubspec defines app versioning and core dependencies including Firebase and Google Maps.
@@ -64,7 +72,7 @@ C --> D
 - [android/app/proguard-rules.pro:1-29](file://android/app/proguard-rules.pro#L1-L29)
 - [android/app/src/main/AndroidManifest.xml:1-101](file://android/app/src/main/AndroidManifest.xml#L1-L101)
 - [android/app/google-services.json:1-48](file://android/app/google-services.json#L1-L48)
-- [pubspec.yaml:1-151](file://pubspec.yaml#L1-L151)
+- [pubspec.yaml:1-152](file://pubspec.yaml#L1-L152)
 
 **Section sources**
 - [android/build.gradle.kts:1-25](file://android/build.gradle.kts#L1-L25)
@@ -74,13 +82,13 @@ C --> D
 - [android/app/proguard-rules.pro:1-29](file://android/app/proguard-rules.pro#L1-L29)
 - [android/app/src/main/AndroidManifest.xml:1-101](file://android/app/src/main/AndroidManifest.xml#L1-L101)
 - [android/app/google-services.json:1-48](file://android/app/google-services.json#L1-L48)
-- [pubspec.yaml:1-151](file://pubspec.yaml#L1-L151)
+- [pubspec.yaml:1-152](file://pubspec.yaml#L1-L152)
 
 ## Core Components
 - Gradle root configuration: Centralizes repositories, sets a shared build directory, and registers a clean task.
 - Settings and plugins: Declares plugin versions (Android Gradle Plugin, Kotlin, Google Services), includes the app module, and integrates Flutter tooling.
-- App build script: Configures compile/target SDKs, Java/Kotlin targets, default config, signing, release build type with R8 shrinking and resource shrinking, and NDK symbol table generation.
-- ProGuard/R8 rules: Keeps Flutter engine classes, notification and Firebase messaging classes, biometric/local auth plugins, and geolocation plugins.
+- App build script: Configures compile/target SDKs, Java/Kotlin targets, default config, signing, release build type with R8 shrinking, resource shrinking, and NDK symbol table generation.
+- ProGuard/R8 rules: Comprehensive rules keeping Flutter engine classes, notification and Firebase messaging classes, biometric/local auth plugins, and geolocation plugins.
 - Manifest: Declares permissions, deep links, and injects Google Maps API key via placeholder.
 - Google services JSON: Provides Firebase project metadata and client IDs for the Android package names.
 - Flutter pubspec: Defines app versioning and dependencies such as Firebase Messaging, Local Notifications, Geolocator, and Google Maps.
@@ -92,10 +100,10 @@ C --> D
 - [android/app/proguard-rules.pro:1-29](file://android/app/proguard-rules.pro#L1-L29)
 - [android/app/src/main/AndroidManifest.xml:1-101](file://android/app/src/main/AndroidManifest.xml#L1-L101)
 - [android/app/google-services.json:1-48](file://android/app/google-services.json#L1-L48)
-- [pubspec.yaml:1-151](file://pubspec.yaml#L1-L151)
+- [pubspec.yaml:1-152](file://pubspec.yaml#L1-L152)
 
 ## Architecture Overview
-The Android build pipeline integrates Flutter, Android Gradle Plugin, Kotlin, and Google Services. The flow below shows how Gradle resolves plugins, applies configurations, and produces a signed release artifact with R8 optimization and symbol tables for crash deobfuscation.
+The Android build pipeline integrates Flutter, Android Gradle Plugin, Kotlin, and Google Services. The flow below shows how Gradle resolves plugins, applies configurations, and produces a signed release artifact with R8 optimization, resource shrinking, and symbol tables for crash deobfuscation.
 
 ```mermaid
 sequenceDiagram
@@ -114,6 +122,7 @@ Gradle->>AGP : Configure compileSdk/minSdk/targetSdk
 Gradle->>AGP : Configure signingConfig (release)
 Gradle->>R8 : Enable minify + shrinkResources
 R8-->>Gradle : Processed bytecode + resources
+AGP->>AGP : Generate NDK symbol tables
 AGP-->>Output : Generate signed APK/AAB
 ```
 
@@ -173,14 +182,23 @@ Recommended practices:
 - [android/app/src/main/AndroidManifest.xml:63-70](file://android/app/src/main/AndroidManifest.xml#L63-L70)
 
 ### ProGuard/R8 Configuration
-- Minification and resource shrinking are enabled for release builds.
+**Updated** Enhanced with comprehensive optimization rules and debug symbol generation
+
+- Minification and resource shrinking are enabled for release builds using R8.
 - Default optimize rules plus app-specific proguard-rules.pro are applied.
 - NDK debugSymbolLevel is set to SYMBOL_TABLE to enable Play Console deobfuscation without shipping full debug symbols.
-- Rules keep Flutter embedding, notifications, Firebase messaging, biometric/local auth, and geolocation plugins.
+- Comprehensive rules keep Flutter embedding, notifications, Firebase messaging, biometric/local auth, and geolocation plugins.
+
+Key optimization features:
+- `isMinifyEnabled = true` enables code shrinking and obfuscation
+- `isShrinkResources = true` removes unused resources
+- `proguardFiles` includes both default optimize rules and custom rules
+- NDK symbol generation enables crash report deobfuscation
 
 Best practices:
 - Validate that reflection-heavy libraries are kept appropriately.
 - Test release builds thoroughly after adding new dependencies.
+- Monitor build times as R8 optimization adds compilation overhead.
 
 **Section sources**
 - [android/app/build.gradle.kts:66-83](file://android/app/build.gradle.kts#L66-L83)
@@ -200,12 +218,12 @@ Notes:
 
 ### Google Play Store Submission
 - The app is configured as an Android application with a stable applicationId.
-- Release builds are signed and optimized with R8.
+- Release builds are signed and optimized with R8, including resource shrinking.
 - Symbol tables are generated for crash deobfuscation.
 
 Submission steps:
 1) Generate a signed release bundle (AAB) using the release build type.
-2) Verify signing configuration and R8 rules.
+2) Verify signing configuration and R8 rules are applied.
 3) Upload the AAB to Google Play Console.
 4) Complete internal testing or rollout tracks as appropriate.
 
@@ -228,14 +246,18 @@ Setup verification:
 - [pubspec.yaml:64-66](file://pubspec.yaml#L64-L66)
 
 ### Crash Reporting and Production Monitoring
+**Updated** Enhanced with debug symbol generation for improved crash reporting
+
 - Firebase Messaging dependency is present; crash reporting typically uses Firebase Crashlytics.
 - The current configuration enables symbol table generation for deobfuscation, which is required for meaningful crash reports.
+- NDK debugSymbolLevel is set to SYMBOL_TABLE to generate minimal symbol information for Play Console deobfuscation.
 - For full Crashlytics integration, ensure the Crashlytics Gradle plugin and related dependencies are added and initialized in the app code.
 
 Recommendations:
 - Add Firebase Crashlytics plugin and dependencies.
 - Initialize Crashlytics in the app startup path.
 - Validate symbol upload to Play Console for deobfuscated stacks.
+- Monitor crash reports to identify any missing keep rules in ProGuard configuration.
 
 **Section sources**
 - [android/app/build.gradle.kts:77-81](file://android/app/build.gradle.kts#L77-L81)
@@ -272,21 +294,29 @@ A --> GS["google-services.json"]
 - [android/app/build.gradle.kts:96-98](file://android/app/build.gradle.kts#L96-L98)
 
 ## Performance Considerations
-- Gradle JVM args: Increased heap size and metaspace to avoid OOM during large builds.
-- Kotlin daemon JVM args: Constrained to prevent exceeding available memory.
+**Updated** Enhanced with new Gradle JVM settings and R8 optimization benefits
+
+- Gradle JVM args: Increased heap size (-Xmx3G) and metaspace (-XX:MaxMetaspaceSize=1G) to avoid OOM during large builds.
+- Kotlin daemon JVM args: Constrained to prevent exceeding available memory (-Xmx2G).
 - R8 minification and resource shrinking reduce artifact size and improve load times.
 - NDK symbol tables enable efficient crash deobfuscation without shipping full debug info.
+- Desugaring library support for modern Java APIs on older Android versions.
 
 Optimization tips:
 - Keep Gradle daemon running between builds.
 - Use parallel tasks and configure worker threads appropriately.
 - Avoid unnecessary dependencies and keep third-party libraries updated.
+- Monitor build times as R8 optimization adds compilation overhead.
+- Consider incremental builds for faster development cycles.
 
 **Section sources**
 - [android/gradle.properties:1-5](file://android/gradle.properties#L1-L5)
 - [android/app/build.gradle.kts:66-83](file://android/app/build.gradle.kts#L66-L83)
+- [android/app/build.gradle.kts:96-98](file://android/app/build.gradle.kts#L96-L98)
 
 ## Troubleshooting Guide
+**Updated** Enhanced with new optimization-related troubleshooting scenarios
+
 Common issues and resolutions:
 - Missing Google Maps API key:
   - Ensure GOOGLE_MAPS_API_KEY is provided via environment variable, Gradle property, or local.properties.
@@ -295,12 +325,19 @@ Common issues and resolutions:
   - Confirm key.properties exists and contains valid storeFile, storePassword, keyAlias, and keyPassword.
   - Check file paths and permissions.
 - Firebase configuration mismatch:
-  - Ensure google-services.json package_name matches the app’s applicationId.
+  - Ensure google-services.json package_name matches the app's applicationId.
 - R8 crashes or runtime reflection errors:
   - Review proguard-rules.pro and add keep rules for newly introduced reflection-heavy libraries.
+  - Check for missing class definitions in release builds.
+- Slow build times due to R8 optimization:
+  - Monitor Gradle build logs for R8 processing time.
+  - Consider enabling incremental builds and caching.
 - Build OOM or slow builds:
-  - Adjust Gradle JVM args and Kotlin daemon args based on machine capacity.
+  - Adjust Gradle JVM args based on machine capacity.
   - Clear caches and rebuild.
+- Crash reports showing obfuscated stack traces:
+  - Verify NDK symbol tables are generated during release builds.
+  - Ensure symbols are uploaded to Play Console for deobfuscation.
 
 **Section sources**
 - [android/app/build.gradle.kts:13-19](file://android/app/build.gradle.kts#L13-L19)
@@ -309,11 +346,13 @@ Common issues and resolutions:
 - [android/gradle.properties:1-5](file://android/gradle.properties#L1-L5)
 
 ## Conclusion
-The Android build is configured for secure, optimized release artifacts with R8 shrinking, resource shrinking, and symbol table generation for crash deobfuscation. Secrets like the Google Maps API key and keystore credentials are managed through environment variables and local properties. Firebase is integrated via the Google Services plugin and relevant dependencies. Following the steps and recommendations in this document will help you produce reliable signed releases and streamline submission to Google Play.
+The Android build is configured for secure, optimized release artifacts with comprehensive R8 minification, resource shrinking, and NDK symbol table generation for crash deobfuscation. Enhanced Gradle JVM settings provide better memory management for large builds. Secrets like the Google Maps API key and keystore credentials are managed through environment variables and local properties. Firebase is integrated via the Google Services plugin and relevant dependencies. The comprehensive ProGuard rules ensure proper handling of Flutter engine, Firebase messaging, biometric authentication, and geolocation plugins. Following the steps and recommendations in this document will help you produce reliable signed releases with optimal performance and streamlined submission to Google Play.
 
 ## Appendices
 
 ### Step-by-Step: Generating Signed APK/AAB
+**Updated** Enhanced with optimization verification steps
+
 1) Prepare secrets:
    - Set GOOGLE_MAPS_API_KEY in your environment or local.properties.
    - Create key.properties with keystore details on your machine or CI.
@@ -322,6 +361,7 @@ The Android build is configured for secure, optimized release artifacts with R8 
 3) Validate outputs:
    - Verify signing and R8 rules are applied.
    - Confirm symbol tables are generated for crash deobfuscation.
+   - Check build logs for R8 optimization completion.
 4) Submit to Google Play:
    - Upload the AAB to Google Play Console and follow rollout procedures.
 
@@ -331,6 +371,8 @@ The Android build is configured for secure, optimized release artifacts with R8 
 - [android/app/build.gradle.kts:66-83](file://android/app/build.gradle.kts#L66-L83)
 
 ### Build Variant Flow
+**Updated** Enhanced with R8 optimization and symbol generation steps
+
 ```mermaid
 flowchart TD
 Start(["Build Entry"]) --> ResolveKeys["Resolve GOOGLE_MAPS_API_KEY<br/>and keystore properties"]
@@ -338,7 +380,8 @@ ResolveKeys --> Config["Apply Android/Flutter/GMS plugins"]
 Config --> Sign["Configure signing for release"]
 Sign --> Optimize["Enable R8 minify + shrinkResources"]
 Optimize --> Symbols["Generate NDK symbol tables"]
-Symbols --> Output(["Signed Release Artifact"])
+Symbols --> Validate["Validate optimization results"]
+Validate --> Output(["Signed Release Artifact"])
 ```
 
 **Diagram sources**

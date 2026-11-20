@@ -1,1 +1,0 @@
-Flutter + Riverpod (`flutter_riverpod`) for state; `equatable` for immutable value objects; `fl_chart` for interactive charts; `intl` for date formatting; `go_router` for navigation.

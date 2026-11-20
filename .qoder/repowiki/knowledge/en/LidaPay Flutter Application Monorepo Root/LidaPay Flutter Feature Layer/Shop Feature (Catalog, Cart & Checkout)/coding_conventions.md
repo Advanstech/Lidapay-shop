@@ -1,0 +1,5 @@
+- Repository methods are declared on the abstract `ShopRepository` interface and implemented by both `RemoteShopRepository` (live HTTP) and `MockShopRepository` (in-memory), with the concrete binding chosen via the single `shopRepositoryProvider`.
+- JSON payloads from the backend are parsed defensively using `payloadPool` plus candidate-key lists (`stringField`, `numberField`, `dateField`) so absent or variably-named fields fall back to safe defaults rather than throwing.
+- Server-shaped state (Cart, Orders, Products) is held in Riverpod `FutureProvider` / `StateNotifierProvider` instances and read by screens; local computation of totals is avoided in favour of re-fetching the server's canonical values.
+- Long-lived async consumers use `autoDispose` (e.g. `userOrdersProvider`, `orderTrackingProvider`) so their streams/timers stop when the owning widget tree is disposed.
+- Checkout mutations go through `CartController._mutate`, which wraps calls in `AsyncLoading.copyWithPrevious` to keep the previous cart visible while loading and clears the idempotency reference on any cart change.

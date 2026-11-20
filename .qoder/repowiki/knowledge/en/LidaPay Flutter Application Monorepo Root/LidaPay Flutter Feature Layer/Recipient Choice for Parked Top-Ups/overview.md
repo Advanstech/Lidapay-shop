@@ -1,0 +1,1 @@
+Flutter feature that lets a recipient choose between direct delivery and Lida Value for a parked top-up, surfacing pending decisions via banner/screen and polling settlement status.

@@ -1,0 +1,1 @@
+Flutter + `flutter_riverpod` for state; `go_router` for navigation; `local_auth` for biometric sign-in; `shared_preferences` for persistence hints; `crypto` (MD5) for Gravatar avatar URL computation in `UserProfile.avatarUrl`.

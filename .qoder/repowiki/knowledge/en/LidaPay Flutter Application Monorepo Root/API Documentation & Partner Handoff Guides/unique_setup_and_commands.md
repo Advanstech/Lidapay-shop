@@ -1,0 +1,1 @@
+Regenerating `ENDPOINTS.md` requires re-running the extraction script against a live instance (the header states it is extracted from `/api-doc` swagger-ui-init.js); manual editing is not the intended update path.

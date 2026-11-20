@@ -1,0 +1,9 @@
+schema_version: 1
+module_path: api_docs
+title: API Documentation & Partner Handoff Guides
+scope:
+    - api/
+    - docs/
+source_files: []
+depends_on: []
+related_to: []

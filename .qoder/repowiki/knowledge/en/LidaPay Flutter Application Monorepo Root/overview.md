@@ -1,0 +1,1 @@
+Single Flutter package root that composes shared core, feature modules, native Android/iOS shells, a web shell with static legal pages, tests, API docs, and dev tooling.

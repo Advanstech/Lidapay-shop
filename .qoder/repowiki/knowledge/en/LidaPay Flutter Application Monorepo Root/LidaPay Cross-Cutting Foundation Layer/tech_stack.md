@@ -1,0 +1,1 @@
+Flutter + Riverpod providers, Dio for HTTP with custom interceptors, go_router for navigation, app_links for `lidapay://` deep links, flutter_secure_storage + SharedPreferences for secrets, device_info_plus + package_info_plus for device metadata, uuid for anonymous device IDs, in_app_update for Play Store immediate/flexible updates.
